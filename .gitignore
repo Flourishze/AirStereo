@@ -1,0 +1,16 @@
+obj/
+dist/
+out/
+packages/
+verify*/
+publish-repo/
+Diagnostics/
+*.obj
+*.pdb
+*.log
+*.jsonl
+.env
+.env.*
+*.pfx
+*.key
+*.user
