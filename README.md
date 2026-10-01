@@ -1,5 +1,7 @@
 # AirStereo
 
+[English](README.en.md)
+
 Windows x64 AirPlay 音频发送应用。当前版本 **1.0.2**，唯一发布与更新来源为 [Flourishze/AirStereo](https://github.com/Flourishze/AirStereo)。
 
 ## 安装与使用
@@ -30,6 +32,3 @@ Windows x64 AirPlay 音频发送应用。当前版本 **1.0.2**，唯一发布�
 ## 许可说明
 
 仓库当前尚未声明开源许可证；公开源码不等于授予未声明的再分发许可。随安装包分发的 .NET 运行时保留其原有 LICENSE 与 ThirdPartyNotices。
-
-
-
