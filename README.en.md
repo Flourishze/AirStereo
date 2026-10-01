@@ -31,4 +31,6 @@ See the [build guide](docs/BUILD.md), [acceptance checklist](docs/TESTING.md), [
 
 ## License
 
-This repository currently does not declare an open-source license. Public source availability does not grant an undisclosed redistribution license. The .NET runtime distributed with the installer remains subject to its original `LICENSE` and `ThirdPartyNotices` files.
+AirStereo's own code and documentation are licensed under the [MIT License](LICENSE), Copyright (c) 2026 Flourishze. The copyright notice and license text must be retained when using, modifying, or distributing the software. The software is provided "as is", without warranty.
+
+Third-party code, dependencies, the .NET runtime, and installer binary templates remain subject to their respective licenses; this repository's MIT License does not change those terms. The .NET runtime distributed with the installer retains its original `LICENSE` and `ThirdPartyNotices` files.
