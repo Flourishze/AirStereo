@@ -1803,6 +1803,7 @@ namespace AirStereo.Ui
             Check,
             Settings,
             Hide,
+            Folder,
             Export
         }
 
@@ -2047,6 +2048,12 @@ namespace AirStereo.Ui
                         graphics.DrawLine(pen, 3, 5, 8, 10);
                         graphics.DrawLine(pen, 8, 10, 13, 5);
                     }
+                    else if (glyph == Glyph.Folder)
+                    {
+                        graphics.DrawLines(pen, new PointF[] {
+                            new PointF(1, 13), new PointF(1, 3), new PointF(6, 3),
+                            new PointF(8, 5), new PointF(15, 5), new PointF(15, 13), new PointF(1, 13) });
+                    }
                     else if (glyph == Glyph.Export)
                     {
                         graphics.DrawLine(pen, 8, 1, 8, 11);
@@ -2081,3 +2088,4 @@ namespace AirStereo.Ui
         }
     }
 }
+

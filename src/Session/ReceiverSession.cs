@@ -63,7 +63,8 @@ namespace AirStereo.Session
         private ManualResetEventSlim feedbackStop;
         /// <summary>Reused for incoming retransmission requests on the audio thread.</summary>
         private byte[] requestBuffer;
-        private bool disposed;
+        private volatile bool disposed;
+        private volatile bool closing;
 
         public Dictionary<string, object> Info { get; private set; }
         /// <summary>Samples of latency the timing packets carry: what this sender asked for.</summary>
@@ -346,7 +347,7 @@ namespace AirStereo.Session
 
         private void EventLoop(ManualResetEventSlim stop)
         {
-            while (!stop.IsSet)
+            while (!stop.IsSet && !closing)
             {
                 try
                 {
@@ -364,7 +365,9 @@ namespace AirStereo.Session
                 }
                 catch (Exception error)
                 {
-                    if (!stop.IsSet) log("event channel closed: " + error.Message);
+                    if (!closing && !stop.IsSet)
+                        log("event channel closed: 音响「" + receiver.Instance + "」（" +
+                            receiver.Address + ":" + receiver.Port + "）: " + error.Message);
                     return;
                 }
             }
@@ -507,14 +510,14 @@ namespace AirStereo.Session
             {
                 lock (controlLock)
                 {
-                    if (disposed) return;
+                    if (disposed || closing) return;
                     try
                     {
                         Feedback();
                     }
                     catch (Exception)
                     {
-                        FeedbackFailures++;
+                        if (!closing) FeedbackFailures++;
                     }
                 }
             }
@@ -528,10 +531,19 @@ namespace AirStereo.Session
                 "{0} ({1}, AirTunes {2}) -> {3}", receiver.Instance, model, source, audioTarget);
         }
 
+        /// <summary>Mark every member before any TEARDOWN can close its peer's event channel.</summary>
+        internal void BeginShutdown()
+        {
+            closing = true;
+        }
+
         public void Dispose()
         {
             if (disposed) return;
+            BeginShutdown();
             disposed = true;
+            // Signal the event reader before TEARDOWN, not after the receiver closes it.
+            eventStop?.Set();
             activeSessions.TryRemove(receiver.Address, out ReceiverSession ignored);
 
             feedbackStop?.Set();
@@ -550,7 +562,6 @@ namespace AirStereo.Session
                 // the receiver may already have dropped the session
             }
 
-            eventStop?.Set();
             if (eventWorker != null && eventWorker.IsAlive) eventWorker.Join(300);
             events?.Dispose();
             feedbackStop?.Dispose();
@@ -562,3 +573,4 @@ namespace AirStereo.Session
         }
     }
 }
+

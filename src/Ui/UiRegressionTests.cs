@@ -140,7 +140,7 @@ namespace AirStereo.Ui
 
             using (MainForm form = new MainForm())
             {
-                const string pairId = "A28C5726-D12E-59F6-A300-0AD44B75E232";
+                const string pairId = "22222222-3333-5444-8555-666666666666";
                 Receiver a = Speaker("卧室", 1, pairId + "+0");
                 Receiver b = Speaker("卧室 (2)", 2, pairId + "+0+4E3DBF86-9427-44C3-B17D-F13346877D04");
                 a.Txt.AddFrom(TxtRecord.Parse("tsid=" + pairId + " tsm=1 igl=0"));
@@ -390,9 +390,9 @@ namespace AirStereo.Ui
             using (MainForm emptyForm = new MainForm())
             {
                 Call(emptyForm, "RefreshFaults");
-                Button exportButton = (Button)Field(emptyForm, "exportFaultsButton");
+                Button folderButton = (Button)Field(emptyForm, "openFaultDirectoryButton");
                 TextBox details = (TextBox)Field(emptyForm, "faultDetails");
-                check("UI disables fault export when there are no fault records", !exportButton.Enabled &&
+                check("UI can open the fault folder even when there are no records", folderButton.Enabled && folderButton.Text == "打开故障文件夹" &&
                     details.Text.Contains("暂无故障记录"), null);
             }
             string root = Path.Combine(AppContext.BaseDirectory, "selftest-artifacts", Guid.NewGuid().ToString("N"));
@@ -423,10 +423,12 @@ namespace AirStereo.Ui
             Func<string, string> releaseJson = tag => "{\"draft\":false,\"prerelease\":false,\"tag_name\":\"" + tag + "\",\"html_url\":\"https://github.com/Flourishze/AirStereo/releases/tag/" + tag + "\"}";
             check("update same version is not an available update", !UpdateService.Parse(releaseJson("v" + VersionInfo.Current)).Available, null);
             check("update older release never offers a downgrade", !UpdateService.Parse(releaseJson("v1.0.0")).Available, null);
-            check("update higher version offers the designated release page", UpdateService.Parse(releaseJson("v1.0.2")).Available, null);
-            foreach (string invalid in new[] { releaseJson("v1.0.2").Replace("\"draft\":false", "\"draft\":true"),
-                releaseJson("v1.0.2").Replace("\"prerelease\":false", "\"prerelease\":true"),
-                releaseJson("v1.0.2").Replace("Flourishze/AirStereo", "other/repository"), releaseJson("v1.0.2-rc1") })
+            Version currentUpdateVersion = UpdateService.StableVersion(VersionInfo.Current);
+            string nextUpdateTag = "v" + new Version(currentUpdateVersion.Major, currentUpdateVersion.Minor, currentUpdateVersion.Build + 1).ToString(3);
+            check("update higher version offers the designated release page", UpdateService.Parse(releaseJson(nextUpdateTag)).Available, null);
+            foreach (string invalid in new[] { releaseJson(nextUpdateTag).Replace("\"draft\":false", "\"draft\":true"),
+                releaseJson(nextUpdateTag).Replace("\"prerelease\":false", "\"prerelease\":true"),
+                releaseJson(nextUpdateTag).Replace("Flourishze/AirStereo", "other/repository"), releaseJson(nextUpdateTag + "-rc1") })
             {
                 bool rejected = false;
                 try { UpdateService.Parse(invalid); } catch (FormatException) { rejected = true; }
@@ -434,7 +436,7 @@ namespace AirStereo.Ui
             }
             using (UpdateHttpStub http = new UpdateHttpStub(HttpStatusCode.NotFound, "{}"))
                 check("update missing release is explicit, never latest-version success", UpdateService.CheckAsync(http).GetAwaiter().GetResult().NoRelease, null);
-            using (UpdateHttpStub http = new UpdateHttpStub(HttpStatusCode.OK, releaseJson("v1.0.2")))
+            using (UpdateHttpStub http = new UpdateHttpStub(HttpStatusCode.OK, releaseJson(nextUpdateTag)))
             {
                 UpdateResult result = UpdateService.CheckAsync(http).GetAwaiter().GetResult();
                 check("update requests only designated repository with user agent and no credentials", result.Available &&
@@ -565,3 +567,6 @@ namespace AirStereo.Ui
         }
     }
 }
+
+
+

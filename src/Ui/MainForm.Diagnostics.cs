@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Diagnostics;
+using System.IO;
+using System.Threading.Tasks;
 using System.Text;
 using System.Windows.Forms;
 
@@ -11,7 +14,7 @@ namespace AirStereo.Ui
         private ListBox faultList;
         private TextBox faultDetails;
         private Label faultPath;
-        private Button exportFaultsButton;
+        private Button openFaultDirectoryButton;
         private CheckBox startupBox;
         private bool startupSyncing;
         private readonly Dictionary<string, DateTime> recentFaults = new Dictionary<string, DateTime>();
@@ -91,11 +94,11 @@ namespace AirStereo.Ui
             Button refresh = NewButton("刷新记录", 120, Glyph.Refresh);
             refresh.Dock = DockStyle.Fill;
             refresh.Click += delegate { RefreshFaults(); };
-            exportFaultsButton = NewButton("导出故障信息", 160, Glyph.Export);
-            exportFaultsButton.Dock = DockStyle.Fill;
-            exportFaultsButton.Click += delegate { ExportFaults(); };
+            openFaultDirectoryButton = NewButton("打开故障文件夹", 160, Glyph.Folder);
+            openFaultDirectoryButton.Dock = DockStyle.Fill;
+            openFaultDirectoryButton.Click += async delegate { await OpenFaultDirectoryAsync(); };
             actions.Controls.Add(refresh, 0, 0);
-            actions.Controls.Add(exportFaultsButton, 1, 0);
+            actions.Controls.Add(openFaultDirectoryButton, 1, 0);
             grid.Controls.Add(faultPath, 0, 0);
             grid.Controls.Add(faultList, 0, 1);
             grid.Controls.Add(faultDetails, 0, 2);
@@ -152,37 +155,49 @@ namespace AirStereo.Ui
             bool hasFaults = visibleFaults.Count > 0;
             faultDetails.Text = hasFaults ? "" : "暂无故障记录。发生连接或其他异常后，故障信息会显示在这里。";
             if (hasFaults) faultList.SelectedIndex = 0;
-            if (exportFaultsButton != null)
-            {
-                exportFaultsButton.Enabled = hasFaults;
-                uiTips.SetToolTip(exportFaultsButton, hasFaults ? "导出故障信息" : "当前没有故障信息可导出");
-            }
+            RefreshFaultPath();
+        }
+
+        private void RefreshFaultPath()
+        {
             faultPath.Text = (FaultStore.Default.IsFallback ? "目录不可写，已保存到：" : "保存到：") + FaultStore.Default.DirectoryPath;
             if (FaultStore.Default.StorageError.Length > 0) faultPath.Text = "记录保存失败：" + FaultStore.Default.StorageError;
             uiTips.SetToolTip(faultPath, faultPath.Text);
+            if (openFaultDirectoryButton != null)
+                uiTips.SetToolTip(openFaultDirectoryButton, "打开故障记录所在文件夹：" + FaultStore.Default.DirectoryPath);
         }
 
-        private void ExportFaults()
+        private async Task OpenFaultDirectoryAsync()
         {
-            // Do not open a modal file dialog for an empty report. In particular, when the
-            // settings window is a borderless owned tool window, an empty export dialog can
-            // appear behind it and look like the application has stopped responding.
-            if (visibleFaults.Count == 0)
+            if (OfflinePreview || !openFaultDirectoryButton.Enabled) return;
+            openFaultDirectoryButton.Enabled = false;
+            try
             {
-                if (faultDetails != null) faultDetails.Text = "暂无故障记录，当前没有可导出的故障信息。";
-                return;
-            }
-            using (SaveFileDialog dialog = new SaveFileDialog { Title = "导出 AirStereo 故障信息",
-                Filter = "诊断报告 (*.json)|*.json", FileName = "AirStereo-Diagnostics-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".json" })
-            {
-                if (dialog.ShowDialog(settingsForm) != DialogResult.OK) return;
-                try { FaultStore.Default.Export(dialog.FileName, DiagnosticContext()); }
-                catch (Exception error)
+                // Folder access and Explorer startup must not block the audio/settings UI.
+                await Task.Run(delegate
                 {
-                    RecordFault("导出失败", error.Message, error);
-                    MessageBox.Show(settingsForm, error.Message, "导出失败", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                }
+                    string directory = FaultStore.Default.EnsureDirectory();
+                    string explorer = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe");
+                    Process.Start(new ProcessStartInfo(explorer, "\"" + directory + "\"")
+                    {
+                        UseShellExecute = false
+                    })?.Dispose();
+                });
+                if (!IsDisposed && !faultPath.IsDisposed) RefreshFaultPath();
+            }
+            catch (Exception error)
+            {
+                if (IsDisposed || faultDetails.IsDisposed) return;
+                // No modal save/error dialogs: keep settings responsive and show the path inline.
+                faultDetails.Text = "无法打开故障文件夹：" + error.Message + Environment.NewLine +
+                    "请手动打开：" + FaultStore.Default.DirectoryPath;
+            }
+            finally
+            {
+                if (!IsDisposed && !openFaultDirectoryButton.IsDisposed)
+                    openFaultDirectoryButton.Enabled = true;
             }
         }
     }
 }
+

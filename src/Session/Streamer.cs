@@ -126,7 +126,6 @@ namespace AirStereo.Session
                 if (handshakeOnly)
                 {
                     log("handshake complete; no audio was sent");
-                    foreach (ReceiverSession session in sessions) session.Dispose();
                     return 0;
                 }
 
@@ -138,6 +137,7 @@ namespace AirStereo.Session
                     {
                         if (stop.IsSet)
                         {
+                            foreach (ReceiverSession session in sessions) session.BeginShutdown();
                             source.Stop();
                             return;
                         }
@@ -180,6 +180,9 @@ namespace AirStereo.Session
             }
             finally
             {
+                // Native pairs can close both event channels when the first member is torn down.
+                // Mark all members first so normal session cleanup is not recorded as a fault.
+                foreach (ReceiverSession session in sessions) session.BeginShutdown();
                 foreach (ReceiverSession session in sessions) session.Dispose();
                 ptp?.Dispose();
                 ntp?.Dispose();
@@ -419,3 +422,4 @@ namespace AirStereo.Session
         }
     }
 }
+

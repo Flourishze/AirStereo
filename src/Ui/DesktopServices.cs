@@ -141,6 +141,21 @@ namespace AirStereo.Ui
             }
         }
 
+        public string EnsureDirectory()
+        {
+            lock (gate)
+            {
+                try { Directory.CreateDirectory(DirectoryPath); }
+                catch
+                {
+                    // No faults yet, or the install directory is read-only: create the fallback.
+                    Directory.CreateDirectory(fallbackDirectory);
+                    DirectoryPath = fallbackDirectory;
+                }
+                return DirectoryPath;
+            }
+        }
+
         public void Export(string path, string context)
         {
             lock (gate)
@@ -156,3 +171,5 @@ namespace AirStereo.Ui
         }
     }
 }
+
+

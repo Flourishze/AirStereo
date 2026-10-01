@@ -15,6 +15,12 @@ function WorkspacePath([string]$relative) {
     return $path
 }
 $build = WorkspacePath $BuildDirectory
+# Do not ship an installer with labels that disagree with the application payload.
+if ($BuildId -notmatch '^\d+\.\d+\.\d+$') { throw 'BuildId must be a stable major.minor.patch version.' }
+$appVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $build 'AirStereo.dll'))
+if ($appVersion.ProductVersion -ne $BuildId -or $appVersion.FileVersion -ne ($BuildId + '.0')) {
+    throw "Application payload version does not match BuildId $BuildId. Rebuild the matching source first."
+}
 $output = WorkspacePath $OutputDirectory
 $installer = Join-Path $output 'AirStereo-Setup.exe'
 if (Test-Path -LiteralPath $installer) { throw 'An installer already exists here. Choose a new output directory.' }
@@ -79,14 +85,14 @@ try {
     $notes = @"
 AirStereo 正式版本 $BuildId（Windows x64）
 
-包含：托盘弹出设备列表、深色设置与均衡器背景、开机自启、故障记录和导出、勾选设备时窗口不再跳动、无故障记录时禁用导出、GitHub 手动检查更新。
+包含：托盘弹出设备列表、深色设置与均衡器背景、开机自启、故障记录和打开故障文件夹、勾选设备时窗口不再跳动、主动停止不再误记连接故障、GitHub 手动检查更新。
 内置匹配的 .NET Core / Desktop $($core.version) 运行时，程序优先使用安装目录内的 dotnet.exe。
 保留单设备完整立体声、自选双设备 L/R 与原生配对音频链路，以及 EQ、平衡和测试音。
 
 安装前请从右下角托盘菜单退出旧版。可选择原目录进行覆盖安装。
 发布前建议：反复勾选/取消；检查四个设置页与均衡器；播放期间打开/关闭设置；再进行真实音响连接与播放。
 故障记录保存在软件目录 Diagnostics；目录不可写时回退到当前用户的本地应用数据目录。
-可在设置的故障记录页查看与导出。
+可在设置的故障记录页查看，并直接打开实际存储目录。
 
 版本信息以指定仓库 https://github.com/Flourishze/AirStereo 的正式 Release 为准。
 "@
@@ -100,26 +106,32 @@ AirStereo 正式版本 $BuildId（Windows x64）
     $setupType = $assembly.MainModule.Types | Where-Object Name -eq 'AirStereoSetup'
     $wizard = $setupType.NestedTypes | Where-Object Name -eq 'WizardForm'
     if ($null -eq $wizard) { throw 'Expected installer wizard was not found.' }
+    $uninstallVersionCount = 0
     foreach ($method in $setupType.Methods) {
         if ($method.Name -ne 'RegisterUninstall' -or -not $method.HasBody) { continue }
         foreach ($instruction in $method.Body.Instructions) {
             if ($instruction.OpCode.Code -eq 'Ldstr' -and $instruction.Operand -eq '1.0') {
                 $instruction.Operand = $BuildId
+                $uninstallVersionCount++
             }
         }
     }
+    if ($uninstallVersionCount -ne 1) { throw "Unexpected uninstall version fields: $uninstallVersionCount" }
     $labelCount = 0
     foreach ($method in $wizard.Methods) {
         if (-not $method.HasBody) { continue }
         foreach ($instruction in $method.Body.Instructions) {
             if ($instruction.OpCode.Code -ne 'Ldstr') { continue }
-            if ($instruction.Operand.StartsWith('HomePod 立体声 AirPlay 发送器') -or $instruction.Operand.StartsWith('版本 1.0    制作人')) {
-                $instruction.Operand = $instruction.Operand.Replace('1.0', $BuildId)
+            if ($instruction.Operand.StartsWith('HomePod 立体声 AirPlay 发送器') -or $instruction.Operand.StartsWith('版本 ')) {
+                $instruction.Operand = [regex]::Replace($instruction.Operand, '(?<=版本 )\d+\.\d+(?:\.\d+)?', $BuildId)
+                $versionLabel = [regex]::Match($instruction.Operand, '(?<=版本 )\d+\.\d+(?:\.\d+)?').Value
+                if ($versionLabel -ne $BuildId) { throw 'Installer wizard version label was not updated.' }
                 $labelCount++
             }
         }
     }
     if ($labelCount -ne 2) { throw "Unexpected wizard identity labels: $labelCount" }
+    $assembly.Name.Version = [version]($BuildId + '.0')
     $assembly.Write($installer)
 } finally { $assembly.Dispose() }
 $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash
@@ -135,3 +147,5 @@ $metadata | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'Packag
 Write-Output "installer=$installer"
 Write-Output "sha256=$hash"
 Write-Output "bytes=$($metadata.Bytes) payloadEntries=$($metadata.PayloadEntries)"
+
+
