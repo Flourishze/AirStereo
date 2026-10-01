@@ -31,4 +31,6 @@ Windows x64 AirPlay 音频发送应用。当前版本 **1.0.2**，唯一发布�
 
 ## 许可说明
 
-仓库当前尚未声明开源许可证；公开源码不等于授予未声明的再分发许可。随安装包分发的 .NET 运行时保留其原有 LICENSE 与 ThirdPartyNotices。
+AirStereo 自有代码与文档采用 [MIT 许可证](LICENSE)，Copyright (c) 2026 Flourishze。使用、修改或分发时须保留版权声明与许可文本；软件按现状提供，不附带保证。
+
+第三方代码、依赖、.NET 运行时与安装器二进制模板不因本仓库采用 MIT 而变更许可，仍须遵守各自的许可条款。随安装包分发的 .NET 运行时保留其原有 LICENSE 与 ThirdPartyNotices。
