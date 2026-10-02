@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$BuildDirectory,
     [Parameter(Mandatory = $true)][string]$OutputDirectory,
@@ -61,6 +61,7 @@ foreach ($name in @('dotnet.exe', 'LICENSE.txt', 'ThirdPartyNotices.txt')) {
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $cecil = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\18\BuildTools\Common7\IDE\Extensions\TestPlatform\Extensions\Mono.Cecil.dll'
 Add-Type -Path $cecil
+. (Join-Path $PSScriptRoot 'patch-installer.ps1')
 $baseInstaller = WorkspacePath $BaseInstaller
 $assembly = [Mono.Cecil.AssemblyDefinition]::ReadAssembly($baseInstaller)
 try {
@@ -82,20 +83,23 @@ try {
         })
     }
     $buildInfo | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $payload 'BuildInfo.json') -Encoding UTF8
-    $notes = @"
-AirStereo 正式版本 $BuildId（Windows x64）
-
-包含：托盘弹出设备列表、深色设置与均衡器背景、开机自启、故障记录和打开故障文件夹、勾选设备时窗口不再跳动、主动停止不再误记连接故障、GitHub 手动检查更新。
-内置匹配的 .NET Core / Desktop $($core.version) 运行时，程序优先使用安装目录内的 dotnet.exe。
-保留单设备完整立体声、自选双设备 L/R 与原生配对音频链路，以及 EQ、平衡和测试音。
-
-安装前请从右下角托盘菜单退出旧版。可选择原目录进行覆盖安装。
-发布前建议：反复勾选/取消；检查四个设置页与均衡器；播放期间打开/关闭设置；再进行真实音响连接与播放。
-故障记录保存在软件目录 Diagnostics；目录不可写时回退到当前用户的本地应用数据目录。
-可在设置的故障记录页查看，并直接打开实际存储目录。
-
-版本信息以指定仓库 https://github.com/Flourishze/AirStereo 的正式 Release 为准。
-"@
+    # Avoid a PowerShell here-string here: on some localized PowerShell hosts the
+    # UTF-8 script is tokenized incorrectly when the closing marker follows CJK
+    # text.  Joining ordinary interpolated lines produces the same release notes.
+    $notes = @(
+        "AirStereo 正式版本 $BuildId（Windows x64）"
+        ""
+        "包含：托盘弹出设备列表、深色设置与均衡器背景、开机自启、故障记录和打开故障文件夹、勾选设备时窗口不再跳动、主动停止不再误记连接故障、GitHub 手动检查更新。"
+        "内置匹配的 .NET Core / Desktop $($core.version) 运行时，程序优先使用安装目录内的 dotnet.exe。"
+        "保留单设备完整立体声、自选双设备 L/R 与原生配对音频链路，以及 EQ、平衡和测试音。"
+        ""
+        "安装前请从右下角托盘菜单退出旧版。可选择原目录进行覆盖安装。"
+        "发布前建议：反复勾选/取消；检查四个设置页与均衡器；播放期间打开/关闭设置；再进行真实音响连接与播放。"
+        "故障记录保存在软件目录 Diagnostics；目录不可写时回退到当前用户的本地应用数据目录。"
+        "可在设置的故障记录页查看，并直接打开实际存储目录。"
+        ""
+        "版本信息以指定仓库 https://github.com/Flourishze/AirStereo 的正式 Release 为准。"
+    ) -join [Environment]::NewLine
     $notes | Set-Content -LiteralPath (Join-Path $payload '发布说明.txt') -Encoding UTF8
     Copy-Item -LiteralPath (Join-Path $payload '发布说明.txt') -Destination (Join-Path $output '发布说明.txt')
     $zip = Join-Path $output 'AirStereoPayload.zip'
@@ -107,11 +111,16 @@ AirStereo 正式版本 $BuildId（Windows x64）
     $wizard = $setupType.NestedTypes | Where-Object Name -eq 'WizardForm'
     if ($null -eq $wizard) { throw 'Expected installer wizard was not found.' }
     $uninstallVersionCount = 0
-    foreach ($method in $setupType.Methods) {
-        if ($method.Name -ne 'RegisterUninstall' -or -not $method.HasBody) { continue }
-        foreach ($instruction in $method.Body.Instructions) {
-            if ($instruction.OpCode.Code -eq 'Ldstr' -and $instruction.Operand -eq '1.0') {
-                $instruction.Operand = $BuildId
+    $registerMethod = $setupType.Methods | Where-Object Name -eq 'RegisterUninstall' | Select-Object -First 1
+    if ($null -ne $registerMethod -and $registerMethod.HasBody) {
+        $instructions = @($registerMethod.Body.Instructions)
+        for ($i = 0; $i -lt $instructions.Count - 1; $i++) {
+            $current = $instructions[$i]
+            $next = $instructions[$i + 1]
+            if ($current.OpCode.Code -eq 'Ldstr' -and $current.Operand -eq 'DisplayVersion' -and
+                $next.OpCode.Code -eq 'Ldstr' -and $next.Operand -is [string] -and
+                $next.Operand -match '^\d+\.\d+(?:\.\d+)?$') {
+                $next.Operand = $BuildId
                 $uninstallVersionCount++
             }
         }
@@ -130,7 +139,16 @@ AirStereo 正式版本 $BuildId（Windows x64）
             }
         }
     }
-    if ($labelCount -ne 2) { throw "Unexpected wizard identity labels: $labelCount" }
+    if ($labelCount -lt 1) { throw "Unexpected wizard identity labels: $labelCount" }
+    # The established previous-path installer template already contains this
+    # method. Reuse it instead of injecting a second copy; older templates are
+    # still supported through the Cecil patch as a fallback.
+    $hasPreviousInstallPathSupport = @(
+        $setupType.Methods | Where-Object Name -eq 'GetPreviousInstallLocation'
+    ).Count -gt 0
+    if (-not $hasPreviousInstallPathSupport) {
+        Add-PreviousInstallPathSupport -Assembly $assembly
+    }
     $assembly.Name.Version = [version]($BuildId + '.0')
     $assembly.Write($installer)
 } finally { $assembly.Dispose() }
