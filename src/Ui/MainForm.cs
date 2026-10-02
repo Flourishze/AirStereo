@@ -52,7 +52,23 @@ namespace AirStereo.Ui
         private Button calibrationButton;
         private ValueSlider volumeBar;
         private Label volumeValue;
+        private BufferedTableLayoutPanel compactRoot;
+        private BufferedTableLayoutPanel compactHeader;
+        private BufferedTableLayoutPanel compactActions;
+        private BufferedTableLayoutPanel compactVolume;
+        private BufferedTableLayoutPanel compactFooter;
         private ThemedSection latencyBox;
+        private TableLayoutPanel settingsOptions;
+        private TableLayoutPanel settingsLatencyTable;
+        private Control settingsRouteBox;
+        private TableLayoutPanel settingsRouteGrid;
+        private TableLayoutPanel settingsGeneralGrid;
+        private TableLayoutPanel settingsFaultGrid;
+        private Panel settingsAudioPage;
+        private Panel settingsGeneralPage;
+        private Panel settingsFaultPage;
+        private bool settingsInitialSizeApplied;
+        private int settingsBaseFontHeight;
         private RadioButton[] latencyModes;
         private ValueSlider latencyBar;
         private Label latencyValue;
@@ -349,25 +365,38 @@ namespace AirStereo.Ui
             box.Margin = new Padding(0, 0, 0, 8);
             box.Padding = new Padding(10, 24, 10, 6);
             BufferedTableLayoutPanel grid = new BufferedTableLayoutPanel();
+            settingsRouteGrid = grid;
             grid.Dock = DockStyle.Fill;
-            grid.ColumnCount = 4;
+            grid.ColumnCount = 5;
             grid.RowCount = 3;
-            foreach (int width in new int[] { 24, 38, 24, 14 })
+            // Keep a small elastic gutter between the device label and the R
+            // test button.  A four-column percentage grid made those controls
+            // touch after WinForms multiplied the font at 125–200% DPI.
+            foreach (int width in new int[] { 24, 18, 18, 26, 14 })
                 grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, width));
-            foreach (int height in new int[] { 36, 38, 25 })
-                grid.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
+            // Percent rows keep the route panel usable when Windows scales the
+            // message font to 175%/200%.  Absolute rows left the slider and
+            // labels fighting for the same pixels on high-DPI displays.
+            grid.RowStyles.Add(new RowStyle(SizeType.Percent, 38F));
+            grid.RowStyles.Add(new RowStyle(SizeType.Percent, 37F));
+            grid.RowStyles.Add(new RowStyle(SizeType.Percent, 25F));
 
             leftTestButton = NewButton("测试完整声道", 120, Glyph.Wave);
             leftTestButton.Dock = DockStyle.Fill;
             leftTestButton.Click += delegate { StartPlayback("left-check"); };
             leftDeviceLabel = new Label { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft,
-                AutoEllipsis = true, ForeColor = InkColor };
+                AutoEllipsis = true, ForeColor = InkColor, Margin = new Padding(0) };
             rightTestButton = NewButton("R ▶ 测试", 110, Glyph.Wave);
             rightTestButton.Dock = DockStyle.Fill;
+            // Keep the test button inside its table cell at high DPI.  The
+            // right-side margin used to be top-only, so TableLayoutPanel could
+            // paint its bottom edge over the following balance row after the
+            // 150%/175%/200% scale pass.
+            rightTestButton.Margin = new Padding(8, 4, 8, 8);
             rightTestButton.Click += delegate { StartPlayback("right-check"); };
             grid.Controls.Add(leftTestButton, 0, 0);
             grid.Controls.Add(leftDeviceLabel, 1, 0);
-            grid.Controls.Add(rightTestButton, 2, 0);
+            grid.Controls.Add(rightTestButton, 3, 0);
 
             BufferedTableLayoutPanel balancePanel = new BufferedTableLayoutPanel();
             balancePanel.Dock = DockStyle.Fill;
@@ -379,9 +408,9 @@ namespace AirStereo.Ui
             balancePanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
             balancePanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 22F));
             Label balanceLeft = new Label { Text = "L", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter,
-                ForeColor = AccentDarkColor, Font = SafeBold(Font, 9F) };
+                ForeColor = AccentDarkColor, Font = SafeBold(Font, 9F), Margin = new Padding(0) };
             Label balanceRight = new Label { Text = "R", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter,
-                ForeColor = AccentDarkColor, Font = SafeBold(Font, 9F) };
+                ForeColor = AccentDarkColor, Font = SafeBold(Font, 9F), Margin = new Padding(0) };
             stereoBalance = new ValueSlider { Minimum = -100, Maximum = 100, Value = 0,
                 SmallChange = 5, LargeChange = 10, Dock = DockStyle.Fill,
                 Margin = new Padding(0, 0, 0, 0) };
@@ -402,13 +431,13 @@ namespace AirStereo.Ui
             uiTips.SetToolTip(resetBalanceButton, "平衡居中");
             resetBalanceButton.Click += delegate { stereoBalance.Value = 0; };
             grid.Controls.Add(balancePanel, 0, 1);
-            grid.SetColumnSpan(balancePanel, 3);
-            grid.Controls.Add(resetBalanceButton, 3, 1);
+            grid.SetColumnSpan(balancePanel, 4);
+            grid.Controls.Add(resetBalanceButton, 4, 1);
 
             routeHint = new Label { Dock = DockStyle.Fill, ForeColor = MutedColor,
-                TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true };
+                TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true, Margin = new Padding(0) };
             grid.Controls.Add(routeHint, 0, 2);
-            grid.SetColumnSpan(routeHint, 4);
+            grid.SetColumnSpan(routeHint, 5);
             box.Controls.Add(grid);
             return box;
         }
@@ -524,6 +553,11 @@ namespace AirStereo.Ui
             IconButton button = new IconButton(glyph);
             button.Text = text;
             button.AutoSize = false;
+            // A scaled WinForms Button can retain its previous scaled height as
+            // MinimumSize.  Dock=Fill then refuses to shrink it when a parent
+            // TableLayoutPanel recomputes its rows, causing the high-DPI overlap
+            // seen in the settings page.  The row, not the child, owns the size.
+            button.MinimumSize = Size.Empty;
             button.Size = new Size(width, 30);
             button.Margin = new Padding(0, 4, 8, 0);
             return button;
@@ -637,6 +671,17 @@ namespace AirStereo.Ui
             RadioButton button = sender as RadioButton;
             if (button == null || !button.Checked) return;
 
+            // Do not disable the whole latency section while a session is running.
+            // WinForms paints disabled RadioButtons with the system disabled colour,
+            // which becomes nearly black against AirStereo's dark surface on some
+            // Windows themes.  Keep the controls readable and simply restore the
+            // negotiated value until the next playback session.
+            if (playing)
+            {
+                RestoreLatencyControls();
+                return;
+            }
+
             selectedMode = (LatencyMode)button.Tag;
             latencySyncing = true;
             try
@@ -661,6 +706,13 @@ namespace AirStereo.Ui
         private void OnLatencySlider(object sender, EventArgs arguments)
         {
             if (latencySyncing) return;
+
+            if (playing)
+            {
+                RestoreLatencyControls();
+                return;
+            }
+
             customLatencyMs = LatencyProfile.FromSlider(latencyBar.Value);
 
             latencySyncing = true;
@@ -672,6 +724,24 @@ namespace AirStereo.Ui
                 {
                     latencyModes[i].Checked = (LatencyMode)latencyModes[i].Tag == LatencyMode.Custom;
                 }
+            }
+            finally
+            {
+                latencySyncing = false;
+            }
+            ShowLatency();
+        }
+
+        private void RestoreLatencyControls()
+        {
+            if (latencyBar == null || latencyModes == null) return;
+            latencySyncing = true;
+            try
+            {
+                latencyBar.Value = LatencyProfile.ToSlider(
+                    LatencyProfile.Resolve(selectedMode, customLatencyMs));
+                for (int i = 0; i < latencyModes.Length; i++)
+                    latencyModes[i].Checked = (LatencyMode)latencyModes[i].Tag == selectedMode;
             }
             finally
             {
@@ -1515,7 +1585,15 @@ namespace AirStereo.Ui
             leftTestButton.Enabled = canTest;
             rightTestButton.Enabled = canTest && SelectedRoute()?.SplitStereo == true;
             // The buffer is negotiated when the stream is set up, so it is fixed while playing.
-            latencyBox.Enabled = !playing;
+            // Keep the latency section enabled while streaming so RadioButton text
+            // does not fall back to a low-contrast system disabled colour.  Changes
+            // are ignored and restored by the handlers above because the buffer is
+            // negotiated during setup and cannot be changed mid-session.
+            latencyBox.Enabled = true;
+            latencyBar.InputLocked = playing;
+            for (int i = 0; i < latencyModes.Length; i++)
+                if (latencyModes[i] is LockedRadioButton locked)
+                    locked.InputLocked = playing;
             UpdateDeviceRows();
             UpdateCompactPlayback();
 
@@ -1829,6 +1907,66 @@ namespace AirStereo.Ui
                 Padding = new Padding(0);
             }
         }
+
+        /// <summary>
+        /// A radio button that can reject input while remaining Enabled=true.  The
+        /// standard WinForms disabled state paints text with the system disabled
+        /// colour, which is very low contrast on AirStereo's dark settings surface.
+        /// </summary>
+        private sealed class LockedRadioButton : RadioButton
+        {
+            private bool inputLocked;
+            internal bool InputLocked
+            {
+                get => inputLocked;
+                set
+                {
+                    if (inputLocked == value) return;
+                    inputLocked = value;
+                    Invalidate();
+                }
+            }
+
+            public LockedRadioButton()
+            {
+                SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                    ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+            }
+
+            protected override void OnClick(EventArgs arguments)
+            {
+                if (InputLocked) return;
+                base.OnClick(arguments);
+            }
+
+            protected override void OnPaint(PaintEventArgs arguments)
+            {
+                Graphics graphics = arguments.Graphics;
+                graphics.Clear(Parent == null ? PanelColor : Parent.BackColor);
+                int diameter = Math.Max(12, (int)Math.Round(13 * DeviceDpi / 96.0));
+                int top = Math.Max(0, (Height - diameter) / 2);
+                Color ring = InputLocked ? Color.FromArgb(100, 107, 119) :
+                    (Checked ? AccentColor : Color.FromArgb(204, 210, 219));
+                Color dot = InputLocked ? Color.FromArgb(128, 135, 147) : AccentColor;
+                using (Pen pen = new Pen(ring, Math.Max(1F, DeviceDpi / 96F)))
+                using (SolidBrush brush = new SolidBrush(dot))
+                {
+                    graphics.DrawEllipse(pen, 1, top + 1, diameter - 2, diameter - 2);
+                    if (Checked)
+                    {
+                        int inset = Math.Max(3, diameter / 4);
+                        graphics.FillEllipse(brush, inset, top + inset,
+                            diameter - inset * 2, diameter - inset * 2);
+                    }
+                }
+
+                Rectangle textBounds = new Rectangle(diameter + 6, 0,
+                    Math.Max(1, Width - diameter - 6), Height);
+                TextRenderer.DrawText(graphics, Text, Font, textBounds, ForeColor,
+                    TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis |
+                    TextFormatFlags.NoPrefix);
+            }
+        }
         private sealed class ThemedSection : Panel
         {
             private readonly string title;
@@ -1856,8 +1994,10 @@ namespace AirStereo.Ui
                 using (Font sectionFont = new Font(Font, FontStyle.Bold))
                 using (SolidBrush brush = new SolidBrush(AccentDarkColor))
                 {
+                    int inset = Math.Max(8, DeviceDpi * 14 / 96);
+                    int titleHeight = Math.Max(22, Font.Height + Math.Max(4, DeviceDpi * 4 / 96));
                     TextRenderer.DrawText(graphics, title, sectionFont,
-                        new Rectangle(14, 1, Math.Max(1, Width - 28), 22),
+                        new Rectangle(inset, 1, Math.Max(1, Width - inset * 2), titleHeight),
                         AccentDarkColor, TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
                 }
             }

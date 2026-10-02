@@ -195,8 +195,15 @@ namespace AirStereo.Ui
                 Set(form, "playing", true); Set(form, "streamReady", true);
                 Set(form, "livePlayback", new LivePlaybackControl(true));
                 Call(form, "UpdateButtons");
-                check("UI streaming locks only negotiated delay settings", !((Control)Field(form, "latencyBox")).Enabled &&
+                check("UI streaming keeps delay settings readable while locking changes", ((Control)Field(form, "latencyBox")).Enabled &&
                     ((ValueSlider)Field(form, "stereoBalance")).Enabled && ((Button)Field(form, "leftTestButton")).Enabled, null);
+                check("UI streaming visually locks delay controls without disabling their text",
+                    ((ValueSlider)Field(form, "latencyBar")).InputLocked &&
+                    ((Array)Field(form, "latencyModes")).Length == 5 &&
+                    ((Control)Field(form, "latencyBox")).Enabled, null);
+                SettingsTabs playingTabs = (SettingsTabs)((DarkSettingsForm)settings).ContentHost.Controls[0];
+                playingTabs.SelectedIndex = 0;
+                RenderPreview(settings, "settings-playing");
                 RenderPreview(form, "popup-playing");
                 form.OfflinePreview = true;
                 form.Opacity = 0;
@@ -247,7 +254,7 @@ namespace AirStereo.Ui
                 check("UI explicit tray exit terminates the popup", form.IsDisposed, null);
             }
 
-            foreach (float scale in new[] { 1F, 1.25F, 1.5F, 2F })
+            foreach (float scale in new[] { 1F, 1.25F, 1.5F, 1.75F, 2F })
             {
                 using (MainForm form = new MainForm())
                 {
@@ -260,7 +267,21 @@ namespace AirStereo.Ui
                     Form settings = (Form)Field(form, "settingsForm");
                     CreateHandles(settings);
                     settings.Scale(new SizeF(scale, scale));
+                    // Scale() changes control bounds in this offline harness, but
+                    // does not emulate Windows' per-monitor font scaling.  Apply
+                    // the equivalent font size so the 175%/200% checks exercise
+                    // the same layout path as a real high-DPI monitor.
+                    settings.Font = new Font(settings.Font.FontFamily, 9F * scale, FontStyle.Regular);
                     settings.PerformLayout();
+                    MethodInfo relayout = typeof(MainForm).GetMethod("ApplySettingsLayout", Private);
+                    relayout.Invoke(form, new object[] { false });
+                    int contentHeight = ((Control)Field(form, "settingsOptions")).Height;
+                    int balanceHeight = ((Control)Field(form, "resetBalanceButton")).Height;
+                    for (int repeat = 0; repeat < 12; repeat++)
+                        relayout.Invoke(form, new object[] { false });
+                    check("UI repeated settings layout does not grow rows at simulated " + (int)(scale * 100) + "%",
+                        ((Control)Field(form, "settingsOptions")).Height == contentHeight &&
+                        ((Control)Field(form, "resetBalanceButton")).Height == balanceHeight, null);
                     SettingsTabs tabs = (SettingsTabs)((DarkSettingsForm)settings).ContentHost.Controls[0];
                     for (int index = 0; index < tabs.PageCount; index++)
                     {
@@ -309,11 +330,61 @@ namespace AirStereo.Ui
                     check("UI enlarged " + (int)(scale * 100) + "% layout has no overlapping controls", Fits(form, ref detail), detail);
                 }
             }
+
+            VerifyFontSizes(check);
+        }
+
+        private static void VerifyFontSizes(Action<string, bool, string> check)
+        {
+            // DPI scaling and the Windows text-size setting are independent.  Exercise
+            // both: a larger message font must not turn the dark settings page into a
+            // clipped or overlapping layout.
+            foreach (float fontSize in new[] { 9F, 10F, 11F, 12F, 14F })
+                foreach (float scale in new[] { 1F, 1.25F, 1.5F, 1.75F, 2F })
+                    using (MainForm form = new MainForm { OfflinePreview = true, Opacity = 0 })
+                    using (Font font = new Font(form.Font.FontFamily, fontSize, FontStyle.Regular))
+                    {
+                        form.Font = font;
+                        Form settings = (Form)Field(form, "settingsForm");
+                        settings.Font = font;
+                        settings.Scale(new SizeF(scale, scale));
+                        settings.Font = new Font(font.FontFamily, fontSize * scale, FontStyle.Regular);
+                        settings.ClientSize = new Size((int)(760 * scale), (int)(620 * scale));
+                        CreateHandles(settings);
+                        SettingsTabs tabs = (SettingsTabs)((DarkSettingsForm)settings).ContentHost.Controls[0];
+                        string detail = "";
+                        for (int index = 0; index < tabs.PageCount; index++)
+                        {
+                            tabs.SelectedIndex = index;
+                            settings.PerformLayout();
+                            detail = "";
+                            check("UI font " + fontSize.ToString("0") + "pt at " + (int)(scale * 100) +
+                                "% settings page " + index + " fits", Fits(settings, ref detail), detail);
+                        }
+
+                        // Keep a representative high-font preview for visual inspection;
+                        // the remaining combinations are covered by geometry checks.
+                        if (fontSize == 14F && (scale == 1F || scale == 1.5F))
+                        {
+                            tabs.SelectedIndex = 0;
+                            RenderPreview(settings, "settings-font-14-" + (int)(scale * 100));
+
+                            Set(form, "playing", true);
+                            Set(form, "streamReady", true);
+                            Set(form, "livePlayback", new LivePlaybackControl(true));
+                            Call(form, "UpdateButtons");
+                            check("UI font 14pt at " + (int)(scale * 100) +
+                                "% keeps locked delay controls readable while playing",
+                                ((ValueSlider)Field(form, "latencyBar")).InputLocked &&
+                                ((Control)Field(form, "latencyBox")).Enabled, null);
+                            RenderPreview(settings, "settings-font-14-playing-" + (int)(scale * 100));
+                        }
+                    }
         }
 
         private static void VerifyPopupSelectionBounds(Action<string, bool, string> check)
         {
-            foreach (float scale in new[] { 1F, 1.25F, 1.5F, 2F })
+            foreach (float scale in new[] { 1F, 1.25F, 1.5F, 1.75F, 2F })
                 foreach (int count in new[] { 1, 2, 5 })
                     using (MainForm form = new MainForm { OfflinePreview = true, Opacity = 0 })
                     {
@@ -559,7 +630,8 @@ namespace AirStereo.Ui
                     if (parent is TabControl && a is TabPage && b is TabPage) continue;
                     if (a.Bounds.IntersectsWith(b.Bounds))
                     {
-                        detail = a.GetType().Name + " '" + a.Text + "' overlaps " + b.GetType().Name + " '" + b.Text + "'";
+                        detail = a.GetType().Name + " '" + a.Text + "' " + a.Bounds + " overlaps " +
+                            b.GetType().Name + " '" + b.Text + "' " + b.Bounds;
                         return false;
                     }
                 }

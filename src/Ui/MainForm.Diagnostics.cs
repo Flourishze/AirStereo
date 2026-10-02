@@ -22,16 +22,16 @@ namespace AirStereo.Ui
 
         private Control BuildGeneralPage()
         {
-            Panel page = new Panel { BackColor = CanvasColor, ForeColor = InkColor, Padding = new Padding(14) };
+            Panel page = new Panel { BackColor = CanvasColor, ForeColor = InkColor, Padding = new Padding(14),
+                AutoScroll = true, AutoScrollMinSize = Size.Empty,
+                HorizontalScroll = { Enabled = false } };
             BufferedTableLayoutPanel grid = Grid(1);
+            settingsGeneralGrid = grid;
             grid.BackColor = CanvasColor;
             grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             grid.RowCount = 5;
             grid.RowStyles.Clear();
-            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
-            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
-            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
-            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
+            for (int i = 0; i < 4; i++) grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
             grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             startupBox = new CheckBox { Text = "登录 Windows 后自动启动", Dock = DockStyle.Fill,
                 ForeColor = InkColor, AccessibleName = "开机自启", AutoEllipsis = true };
@@ -60,8 +60,11 @@ namespace AirStereo.Ui
 
         private Control BuildFaultPage()
         {
-            Panel page = new Panel { BackColor = CanvasColor, ForeColor = InkColor, Padding = new Padding(10) };
+            Panel page = new Panel { BackColor = CanvasColor, ForeColor = InkColor, Padding = new Padding(10),
+                AutoScroll = true, AutoScrollMinSize = Size.Empty,
+                HorizontalScroll = { Enabled = false } };
             BufferedTableLayoutPanel grid = Grid(1);
+            settingsFaultGrid = grid;
             grid.BackColor = CanvasColor;
             grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             grid.RowCount = 4;

@@ -11,6 +11,21 @@ namespace AirStereo.Ui
         private int minimum;
         private int maximum = 100;
         private int value;
+        /// <summary>
+        /// Blocks user input without setting Enabled=false.  This keeps the slider's
+        /// normal theme colours readable while a negotiated stream is running.
+        /// </summary>
+        private bool inputLocked;
+        public bool InputLocked
+        {
+            get => inputLocked;
+            set
+            {
+                if (inputLocked == value) return;
+                inputLocked = value;
+                Invalidate();
+            }
+        }
         public event EventHandler ValueChanged;
         public int Minimum { get => minimum; set { minimum = value; Value = this.value; Invalidate(); } }
         public int Maximum { get => maximum; set { maximum = value; Value = this.value; Invalidate(); } }
@@ -51,7 +66,7 @@ namespace AirStereo.Ui
         protected override void OnMouseDown(MouseEventArgs args)
         {
             base.OnMouseDown(args);
-            if (args.Button != MouseButtons.Left) return;
+            if (InputLocked || args.Button != MouseButtons.Left) return;
             Focus();
             Capture = true;
             SetFromPointer(args.X);
@@ -60,7 +75,7 @@ namespace AirStereo.Ui
         protected override void OnMouseMove(MouseEventArgs args)
         {
             base.OnMouseMove(args);
-            if (Capture && args.Button == MouseButtons.Left) SetFromPointer(args.X);
+            if (!InputLocked && Capture && args.Button == MouseButtons.Left) SetFromPointer(args.X);
         }
 
         protected override void OnMouseUp(MouseEventArgs args)
@@ -79,6 +94,7 @@ namespace AirStereo.Ui
         protected override void OnKeyDown(KeyEventArgs args)
         {
             base.OnKeyDown(args);
+            if (InputLocked) return;
             if (args.KeyCode == Keys.Left || args.KeyCode == Keys.Down) Value -= SmallChange;
             else if (args.KeyCode == Keys.Right || args.KeyCode == Keys.Up) Value += SmallChange;
             else if (args.KeyCode == Keys.PageDown) Value -= LargeChange;
@@ -92,6 +108,7 @@ namespace AirStereo.Ui
         protected override void OnMouseWheel(MouseEventArgs args)
         {
             base.OnMouseWheel(args);
+            if (InputLocked) return;
             Value += args.Delta / SystemInformation.MouseWheelScrollDelta * SmallChange;
         }
 
@@ -108,7 +125,12 @@ namespace AirStereo.Ui
             int y = Height / 2;
             int end = Math.Max(inset, Width - inset);
             int thumb = inset + (int)Math.Round((end - inset) * (value - minimum) / (double)Math.Max(1, maximum - minimum));
-            Color accent = Enabled ? Color.FromArgb(119, 169, 247) : Color.FromArgb(100, 107, 119);
+            // A negotiated buffer cannot be changed mid-session.  Use a muted rail
+            // and thumb for that state, but do not set Enabled=false: WinForms would
+            // also darken surrounding text on some Windows themes.
+            Color accent = !Enabled || InputLocked
+                ? Color.FromArgb(100, 107, 119)
+                : Color.FromArgb(119, 169, 247);
             using (Pen rail = new Pen(Color.FromArgb(97, 103, 113), Math.Max(2, DeviceDpi / 32F)))
             using (Pen fill = new Pen(accent, rail.Width))
             using (SolidBrush knob = new SolidBrush(accent))

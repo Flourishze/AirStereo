@@ -34,6 +34,7 @@ namespace AirStereo.Ui
         internal Panel ContentHost { get; }
         internal Button CloseWindowButton { get; }
         private readonly TitleBar title;
+        private readonly TableLayoutPanel frame;
         private readonly ToolTip tips = new ToolTip();
 
         internal DarkSettingsForm()
@@ -42,7 +43,7 @@ namespace AirStereo.Ui
             BackColor = DesktopTheme.Canvas;
             ForeColor = DesktopTheme.Ink;
             Padding = new Padding(1);
-            TableLayoutPanel frame = new TableLayoutPanel { Dock = DockStyle.Fill, Margin = new Padding(0),
+            frame = new TableLayoutPanel { Dock = DockStyle.Fill, Margin = new Padding(0),
                 RowCount = 2, ColumnCount = 1, BackColor = DesktopTheme.Canvas };
             frame.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             frame.RowStyles.Add(new RowStyle(SizeType.Absolute, 38));
@@ -58,6 +59,31 @@ namespace AirStereo.Ui
             frame.Controls.Add(ContentHost, 0, 1);
             Controls.Add(frame);
             SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+            ApplyDpiLayout();
+        }
+
+        private void ApplyDpiLayout()
+        {
+            int dpi = Math.Max(96, DeviceDpi);
+            int pixels(int value) => Math.Max(1, (int)Math.Round(value * dpi / 96.0));
+            int titleHeight = Math.Max(pixels(38), Font.Height + pixels(18));
+            frame.RowStyles[0].Height = titleHeight;
+            CloseWindowButton.Width = Math.Max(pixels(40), Font.Height + pixels(18));
+            Padding = new Padding(Math.Max(1, pixels(1)));
+            frame.PerformLayout();
+        }
+
+        protected override void OnFontChanged(EventArgs args)
+        {
+            base.OnFontChanged(args);
+            ApplyDpiLayout();
+            title?.Invalidate();
+        }
+
+        protected override void OnDpiChanged(DpiChangedEventArgs args)
+        {
+            base.OnDpiChanged(args);
+            ApplyDpiLayout();
         }
 
         protected override void OnTextChanged(EventArgs args)
@@ -153,7 +179,9 @@ namespace AirStereo.Ui
         private readonly List<Button> buttons = new List<Button>();
         private readonly TableLayoutPanel navigation;
         private readonly Panel content;
+        private readonly TableLayoutPanel root;
         private int selectedIndex = -1;
+        internal event EventHandler SelectedIndexChanged;
         internal int PageCount => pages.Count;
         internal Control PageAt(int index) => pages[index];
         internal Control Navigation => navigation;
@@ -175,17 +203,22 @@ namespace AirStereo.Ui
                 }
                 pages[value].BringToFront();
                 content.ResumeLayout(true);
+                SelectedIndexChanged?.Invoke(this, EventArgs.Empty);
             }
         }
 
         internal SettingsTabs()
         {
-            AutoScaleMode = AutoScaleMode.Inherit;
+            // The parent settings form uses an explicit DPI layout.  Inherit would
+            // run another automatic scale pass over the already-sized pages when a
+            // high-DPI monitor creates the handle, which is the source of the
+            // compressed/clipped settings screenshots at 175% and 200%.
+            AutoScaleMode = AutoScaleMode.None;
             BackColor = DesktopTheme.Canvas;
             ForeColor = DesktopTheme.Ink;
             Dock = DockStyle.Fill;
             SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true);
-            TableLayoutPanel root = new TableLayoutPanel { Dock = DockStyle.Fill, Margin = new Padding(0),
+            root = new TableLayoutPanel { Dock = DockStyle.Fill, Margin = new Padding(0),
                 ColumnCount = 1, RowCount = 2, BackColor = DesktopTheme.Canvas };
             root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
@@ -197,6 +230,24 @@ namespace AirStereo.Ui
             root.Controls.Add(navigation, 0, 0);
             root.Controls.Add(content, 0, 1);
             Controls.Add(root);
+            ApplyDpiLayout();
+        }
+
+        private void ApplyDpiLayout()
+        {
+            int dpi = Math.Max(96, DeviceDpi);
+            int pixels(int value) => Math.Max(1, (int)Math.Round(value * dpi / 96.0));
+            root.RowStyles[0].Height = Math.Max(pixels(42), Font.Height + pixels(16));
+            navigation.Padding = new Padding(pixels(10), pixels(5), pixels(10), 0);
+            foreach (Button button in buttons)
+                button.MinimumSize = new Size(0, Math.Max(pixels(32), Font.Height + pixels(12)));
+            root.PerformLayout();
+        }
+
+        protected override void OnFontChanged(EventArgs args)
+        {
+            base.OnFontChanged(args);
+            ApplyDpiLayout();
         }
 
         internal void AddPage(string name, Control page)

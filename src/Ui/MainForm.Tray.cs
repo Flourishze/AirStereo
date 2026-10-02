@@ -31,12 +31,14 @@ namespace AirStereo.Ui
                 Dock = DockStyle.Fill, Padding = new Padding(14, 10, 14, 10),
                 BackColor = CanvasColor, ColumnCount = 1, RowCount = 6
             };
+            compactRoot = root;
             root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             foreach (float height in new[] { 44F, 0F, 32F, 40F, 56F, 48F })
                 root.RowStyles.Add(new RowStyle(height == 0 ? SizeType.Percent : SizeType.Absolute,
                     height == 0 ? 100 : height));
 
             BufferedTableLayoutPanel header = Grid(4);
+            compactHeader = header;
             header.BackColor = CanvasColor;
             header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             for (int i = 0; i < 3; i++) header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 36));
@@ -62,6 +64,7 @@ namespace AirStereo.Ui
             root.Controls.Add(targetDetail, 0, 2);
 
             BufferedTableLayoutPanel actions = Grid(2);
+            compactActions = actions;
             actions.BackColor = CanvasColor;
             actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             actions.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 44));
@@ -76,6 +79,7 @@ namespace AirStereo.Ui
             root.Controls.Add(actions, 0, 3);
 
             BufferedTableLayoutPanel volume = Grid(4);
+            compactVolume = volume;
             volume.Padding = new Padding(8, 8, 6, 8);
             volume.Margin = new Padding(0, 4, 0, 4);
             volume.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 48));
@@ -98,6 +102,7 @@ namespace AirStereo.Ui
             root.Controls.Add(volume, 0, 4);
 
             BufferedTableLayoutPanel footer = Grid(1);
+            compactFooter = footer;
             footer.BackColor = CanvasColor;
             footer.RowCount = 2;
             footer.RowStyles.Clear();
@@ -117,7 +122,45 @@ namespace AirStereo.Ui
             // the same fields and event handlers; only their presentation has moved.
             statusLabel = new ToolStripStatusLabel("正在准备…");
             BuildSettingsWindow();
+            ApplyCompactLayout();
             UpdateRouteUi();
+        }
+
+        private void ApplyCompactLayout()
+        {
+            if (compactRoot == null) return;
+            int text = Math.Max(16, Font.Height);
+            int header = Math.Max(UiPixels(44), text + UiPixels(16));
+            int detail = Math.Max(UiPixels(32), text + UiPixels(10));
+            int action = Math.Max(UiPixels(40), text + UiPixels(12));
+            int volume = Math.Max(UiPixels(56), text + UiPixels(22));
+            int footer = Math.Max(UiPixels(48), text * 2 + UiPixels(12));
+
+            compactRoot.RowStyles.Clear();
+            compactRoot.RowStyles.Add(new RowStyle(SizeType.Absolute, header));
+            compactRoot.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            compactRoot.RowStyles.Add(new RowStyle(SizeType.Absolute, detail));
+            compactRoot.RowStyles.Add(new RowStyle(SizeType.Absolute, action));
+            compactRoot.RowStyles.Add(new RowStyle(SizeType.Absolute, volume));
+            compactRoot.RowStyles.Add(new RowStyle(SizeType.Absolute, footer));
+            compactRoot.Padding = new Padding(UiPixels(14), UiPixels(10), UiPixels(14), UiPixels(10));
+
+            compactHeader.ColumnStyles.Clear();
+            compactHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            for (int i = 0; i < 3; i++) compactHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UiPixels(36)));
+            compactActions.ColumnStyles.Clear();
+            compactActions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            compactActions.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UiPixels(44)));
+            compactVolume.Padding = new Padding(UiPixels(8), UiPixels(8), UiPixels(6), UiPixels(8));
+            compactVolume.ColumnStyles.Clear();
+            compactVolume.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UiPixels(48)));
+            compactVolume.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            compactVolume.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UiPixels(46)));
+            compactVolume.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UiPixels(36)));
+            compactFooter.RowStyles.Clear();
+            compactFooter.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+            compactFooter.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+            LayoutSettingsTree(compactRoot);
         }
 
         private static BufferedTableLayoutPanel Grid(int columns)
@@ -142,10 +185,26 @@ namespace AirStereo.Ui
         {
             settingsForm = new DarkSettingsForm { Text = "AirStereo · 音频设置", Font = Font,
                 BackColor = CanvasColor, ForeColor = InkColor,
-                AutoScaleDimensions = new SizeF(96, 96), AutoScaleMode = AutoScaleMode.Dpi,
-                ClientSize = new Size(560, 490), MinimumSize = new Size(540, 490),
+                // The settings tree is laid out in pixels from the current monitor DPI.
+                // Letting WinForms run a second automatic scale pass here is what caused
+                // the 175%/200% dialog to contain controls larger than their section.
+                // DarkSettingsForm handles DPI changes explicitly below instead.
+                AutoScaleDimensions = new SizeF(96, 96), AutoScaleMode = AutoScaleMode.None,
+                // Keep a usable logical width at high DPI.  The old 600x540 window
+                // left only a narrow strip for each table column after 175%/200%
+                // font scaling, so labels and buttons were compressed into each
+                // other even though the controls themselves were technically docked.
+                ClientSize = new Size(640, 580), MinimumSize = new Size(560, 440),
                 ShowInTaskbar = false, MaximizeBox = false, MinimizeBox = false,
                 StartPosition = FormStartPosition.CenterScreen };
+            // Keep the unscaled reference.  The offline DPI harness and Windows
+            // text-size settings can scale the Font independently of DeviceDpi.
+            // This lets the layout use the larger of the two scale signals.
+            settingsBaseFontHeight = Math.Max(1, settingsForm.Font.Height);
+            settingsForm.Shown += delegate { ApplySettingsLayout(true); };
+            settingsForm.DpiChanged += delegate { ApplySettingsLayout(true); };
+            settingsForm.FontChanged += delegate { ApplySettingsLayout(false); };
+            settingsForm.SizeChanged += delegate { ApplySettingsLayout(false); };
             settingsForm.FormClosing += delegate (object sender, FormClosingEventArgs args)
             {
                 if (!exiting && args.CloseReason == CloseReason.UserClosing)
@@ -157,22 +216,30 @@ namespace AirStereo.Ui
                 }
             };
             SettingsTabs tabs = new SettingsTabs();
-            Panel audio = new Panel { BackColor = CanvasColor, Padding = new Padding(10) };
-            Panel logs = new Panel { BackColor = CanvasColor, Padding = new Padding(10) };
+            Panel audio = new Panel { BackColor = CanvasColor, Padding = new Padding(10),
+                AutoScroll = true, AutoScrollMinSize = Size.Empty,
+                HorizontalScroll = { Enabled = false } };
+            Panel logs = new Panel { BackColor = CanvasColor, Padding = new Padding(10),
+                AutoScroll = true, AutoScrollMinSize = Size.Empty,
+                HorizontalScroll = { Enabled = false } };
             BufferedTableLayoutPanel options = Grid(1);
+            settingsOptions = options;
             options.BackColor = CanvasColor;
+            options.Dock = DockStyle.Top;
+            options.AutoScroll = false;
+            options.AutoSize = false;
             options.RowCount = 4;
             options.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             options.RowStyles.Clear();
-            foreach (float height in new[] { 142F, 190F, 42F, 0F })
-                options.RowStyles.Add(new RowStyle(height == 0 ? SizeType.Percent : SizeType.Absolute, height));
-            options.Controls.Add(BuildRouteBox(), 0, 0);
+            for (int i = 0; i < 4; i++) options.RowStyles.Add(new RowStyle(SizeType.Absolute, 1));
+            settingsRouteBox = BuildRouteBox();
+            options.Controls.Add(settingsRouteBox, 0, 0);
             options.Controls.Add(BuildSettingsLatency(), 0, 1);
             BufferedTableLayoutPanel commands = Grid(2);
             commands.BackColor = CanvasColor;
             commands.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
             commands.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-            patternButton = NewButton("循环声道测试", 160, Glyph.Wave);
+            patternButton = NewButton("循环测试", 160, Glyph.Wave);
             patternButton.Dock = DockStyle.Fill;
             patternButton.Click += delegate { StartPlayback("pattern"); };
             calibrationButton = NewButton("均衡器与校准", 160, Glyph.Wave);
@@ -181,13 +248,170 @@ namespace AirStereo.Ui
             commands.Controls.Add(patternButton, 0, 0);
             commands.Controls.Add(calibrationButton, 1, 0);
             options.Controls.Add(commands, 0, 2);
+            settingsAudioPage = audio;
             audio.Controls.Add(options);
             logs.Controls.Add(BuildLogBox());
             tabs.AddPage("音频", audio);
-            tabs.AddPage("常规", BuildGeneralPage());
-            tabs.AddPage("故障记录", BuildFaultPage());
+            settingsGeneralPage = (Panel)BuildGeneralPage();
+            settingsFaultPage = (Panel)BuildFaultPage();
+            tabs.AddPage("常规", settingsGeneralPage);
+            tabs.AddPage("故障记录", settingsFaultPage);
             tabs.AddPage("诊断日志", logs);
+            tabs.SelectedIndexChanged += delegate { ResetSettingsPageScroll(tabs); };
             ((DarkSettingsForm)settingsForm).ContentHost.Controls.Add(tabs);
+            ApplySettingsLayout(false);
+        }
+
+        private static void ResetSettingsPageScroll(SettingsTabs tabs)
+        {
+            if (tabs == null || tabs.SelectedIndex < 0 || tabs.SelectedIndex >= tabs.PageCount) return;
+            ScrollableControl page = tabs.PageAt(tabs.SelectedIndex) as ScrollableControl;
+            if (page == null || !page.AutoScroll) return;
+            page.AutoScrollPosition = Point.Empty;
+            page.PerformLayout();
+        }
+
+        /// <summary>
+        /// Recalculates the settings page's vertical budget from the actual font.
+        /// WinForms scales controls but does not recalculate TableLayoutPanel absolute
+        /// rows, which is why the old fixed 142/240/52 rows collapsed at 175% and 200%.
+        /// </summary>
+        private void ApplySettingsLayout(bool allowInitialResize)
+        {
+            if (settingsForm == null || settingsOptions == null) return;
+            Rectangle work = Screen.FromControl(settingsForm).WorkingArea;
+            int dpi = Math.Max(96, settingsForm.DeviceDpi);
+            int DpiPixels(int logical) => Math.Max(1, (int)Math.Round(logical * dpi / 96.0));
+            int text = Math.Max(16, settingsForm.Font.Height);
+            double fontScale = settingsBaseFontHeight > 0
+                ? settingsForm.Font.Height / (double)settingsBaseFontHeight : 1.0;
+            double visualScale = Math.Max(1.0, Math.Max(dpi / 96.0, fontScale));
+            int VisualPixels(int logical) => Math.Max(1, (int)Math.Round(logical * visualScale));
+            // Do not rely on Font.Height alone.  Windows may report a font that is
+            // already scaled while a newly-created child control still has its
+            // logical size.  Use the larger of the measured text and the explicit
+            // DPI size for every row/padding so neither case can clip the caption.
+            int routeHeight = Math.Max(DpiPixels(160), text * 7 + DpiPixels(24));
+            int modeRow = Math.Max(DpiPixels(28), text + DpiPixels(8));
+            int sliderRow = Math.Max(DpiPixels(34), text + DpiPixels(12));
+            int valueRow = Math.Max(DpiPixels(24), text + DpiPixels(6));
+            int hintRow = Math.Max(DpiPixels(42), text * 2 + DpiPixels(8));
+            int sectionTop = Math.Max(DpiPixels(24), text + DpiPixels(10));
+            int sectionBottom = Math.Max(DpiPixels(8), text / 2);
+            // The section title/padding and its bottom margin are outside the
+            // inner table.  Keep a little rounding slack as well; without it the
+            // hint row ended 8–16px below its parent after WinForms scaled the
+            // form, which is exactly the clipped 175%/200% symptom.
+            int latencyHeight = modeRow * 3 + sliderRow + valueRow + hintRow + 88;
+            int commandHeight = Math.Max(DpiPixels(56), text + DpiPixels(26));
+
+            settingsOptions.Height = routeHeight + latencyHeight + commandHeight + 8;
+            settingsOptions.RowStyles.Clear();
+            settingsOptions.RowStyles.Add(new RowStyle(SizeType.Absolute, routeHeight));
+            settingsOptions.RowStyles.Add(new RowStyle(SizeType.Absolute, latencyHeight));
+            settingsOptions.RowStyles.Add(new RowStyle(SizeType.Absolute, commandHeight));
+            settingsOptions.RowStyles.Add(new RowStyle(SizeType.Absolute, 8));
+
+            if (settingsLatencyTable != null)
+            {
+                settingsLatencyTable.RowStyles.Clear();
+                settingsLatencyTable.RowStyles.Add(new RowStyle(SizeType.Absolute, modeRow * 3));
+                settingsLatencyTable.RowStyles.Add(new RowStyle(SizeType.Absolute, sliderRow));
+                settingsLatencyTable.RowStyles.Add(new RowStyle(SizeType.Absolute, valueRow));
+                settingsLatencyTable.RowStyles.Add(new RowStyle(SizeType.Absolute, hintRow));
+            }
+            if (settingsRouteGrid != null)
+            {
+                settingsRouteGrid.RowStyles.Clear();
+                // Include the button's scaled height and its top margin in the
+                // row budget.  Using the current child Height is unstable after
+                // a resize, while a DPI-derived floor is deterministic.
+                // IconButton keeps a scaled top margin.  Reserve that margin plus
+                // a small bottom breathing space as part of the row; otherwise
+                // the next balance row can start a few pixels before the button's
+                // painted bottom at 150% and above.
+                int routeRow = Math.Max(Math.Max(DpiPixels(52), VisualPixels(52)),
+                    text + Math.Max(DpiPixels(20), VisualPixels(20)));
+                // Derive sizes only from font/DPI, never from the previous docked
+                // control Height. Feeding Height back into this calculation made
+                // each resize/reopen grow the balance row by another eight pixels.
+                int balanceRow = routeRow;
+                settingsRouteGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, routeRow));
+                settingsRouteGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, balanceRow));
+                settingsRouteGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, Math.Max(DpiPixels(25), text + DpiPixels(8))));
+                // Leave a full scaled line of slack below the route hint.  At
+                // very large text settings the label's measured height can be
+                // one row taller than Font.Height, and the old margin let its
+                // bottom edge fall outside the section by a few pixels.
+                routeHeight = routeRow + balanceRow + Math.Max(DpiPixels(25), text + DpiPixels(8)) +
+                    sectionTop + sectionBottom + settingsRouteBox.Margin.Vertical;
+            }
+            // The section's padding/title consumes space outside the inner table.
+            // Explicit minimum sizes prevent TableLayoutPanel from shrinking the
+            // section back to a stale DPI-scaled height after the host is resized.
+            int latencyMinimum = modeRow * 3 + sliderRow + valueRow + hintRow +
+                sectionTop + sectionBottom + latencyBox.Margin.Vertical;
+            latencyBox.Padding = new Padding(DpiPixels(10), sectionTop, DpiPixels(10), sectionBottom);
+            latencyBox.MinimumSize = new Size(0, latencyMinimum - latencyBox.Margin.Vertical);
+            settingsOptions.RowStyles[1].Height = latencyMinimum;
+            if (settingsRouteBox != null)
+            {
+                // The route section has its own title and padding.  Give it a
+                // larger floor than the inner three rows so a scaled font never
+                // clips the bottom hint or the reset button.
+                settingsRouteBox.Padding = new Padding(DpiPixels(10), sectionTop, DpiPixels(10), sectionBottom);
+                settingsRouteBox.MinimumSize = new Size(0, routeHeight - settingsRouteBox.Margin.Vertical);
+                settingsOptions.RowStyles[0].Height = routeHeight;
+            }
+            settingsOptions.Height = routeHeight + latencyMinimum + commandHeight + 8;
+            settingsGeneralGrid?.RowStyles.Clear();
+            if (settingsGeneralGrid != null)
+            {
+                for (int i = 0; i < 4; i++) settingsGeneralGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, Math.Max(DpiPixels(44), text + DpiPixels(20))));
+                settingsGeneralGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            }
+            if (settingsFaultGrid != null)
+            {
+                settingsFaultGrid.RowStyles.Clear();
+                settingsFaultGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, Math.Max(DpiPixels(28), text + DpiPixels(8))));
+                settingsFaultGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 45));
+                settingsFaultGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 55));
+                settingsFaultGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, Math.Max(DpiPixels(40), text + DpiPixels(22))));
+            }
+
+            // Make the first display of the settings dialog wider/taller on a high-DPI
+            // screen, but cap it to the monitor so a laptop never opens off-screen.
+            if (settingsForm.IsHandleCreated)
+            {
+                int minimumWidth = Math.Min(Math.Max(560, work.Width - DpiPixels(24)), DpiPixels(680));
+                int minimumHeight = Math.Min(Math.Max(440, work.Height - DpiPixels(24)), DpiPixels(440));
+                settingsForm.MinimumSize = new Size(minimumWidth, minimumHeight);
+                if (dpi >= 144 || text >= 20)
+                {
+                    int width = Math.Min(work.Width - DpiPixels(24), Math.Max(settingsForm.ClientSize.Width, DpiPixels(760)));
+                    int height = Math.Min(work.Height - DpiPixels(24), Math.Max(settingsForm.ClientSize.Height, DpiPixels(680)));
+                    if (allowInitialResize && !settingsInitialSizeApplied ||
+                        settingsForm.ClientSize.Width < minimumWidth || settingsForm.ClientSize.Height < minimumHeight)
+                        settingsForm.ClientSize = new Size(Math.Max(minimumWidth, width), Math.Max(minimumHeight, height));
+                }
+                settingsInitialSizeApplied = true;
+            }
+            settingsOptions.PerformLayout();
+            settingsForm.PerformLayout();
+            LayoutSettingsTree(settingsForm);
+            // A DPI change or a previous visit can leave the page scrolled to the
+            // middle of the audio options.  That makes the section title appear
+            // cut in half (especially on 175%/200% displays), even though the
+            // controls below it are laid out correctly.  Start a fresh display at
+            // the top; the page remains scrollable when the monitor is too short.
+            if (allowInitialResize && settingsAudioPage != null)
+                settingsAudioPage.AutoScrollPosition = Point.Empty;
+        }
+
+        private static void LayoutSettingsTree(Control control)
+        {
+            control.PerformLayout();
+            foreach (Control child in control.Controls) LayoutSettingsTree(child);
         }
 
         private Control BuildSettingsLatency()
@@ -197,26 +421,30 @@ namespace AirStereo.Ui
             latencyBox.Margin = new Padding(0, 0, 0, 8);
             latencyBox.Padding = new Padding(10, 26, 10, 8);
             BufferedTableLayoutPanel table = Grid(1);
+            settingsLatencyTable = table;
             table.RowCount = 4;
             table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             table.RowStyles.Clear();
-            foreach (float height in new[] { 62F, 32F, 25F, 25F })
-                table.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
-            BufferedTableLayoutPanel modes = Grid(3);
-            modes.RowCount = 2;
+            for (int i = 0; i < 4; i++) table.RowStyles.Add(new RowStyle(SizeType.Absolute, 1));
+            BufferedTableLayoutPanel modes = Grid(2);
+            // Two columns leave each option a predictable minimum width.  Three
+            // columns looked compact at 96 DPI but clipped labels on larger text
+            // settings and on systems with different CJK font metrics.
+            modes.RowCount = 3;
             modes.RowStyles.Clear();
-            modes.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
-            modes.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
-            for (int i = 0; i < 3; i++) modes.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33F));
+            for (int i = 0; i < 3; i++) modes.RowStyles.Add(new RowStyle(SizeType.Percent, 33.33F));
+            for (int i = 0; i < 2; i++) modes.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
             string[] names = { "实时 · 120 ms", "标准 · 200 ms", "缓冲 · 500 ms", "稳定 · 1000 ms", "自定义" };
             latencyModes = new RadioButton[5];
             for (int i = 0; i < latencyModes.Length; i++)
             {
-                RadioButton mode = new RadioButton { Text = names[i], Tag = (LatencyMode)i,
-                    Dock = DockStyle.Fill, ForeColor = InkColor, AutoEllipsis = true, Margin = new Padding(0) };
+                LockedRadioButton mode = new LockedRadioButton { Text = names[i], Tag = (LatencyMode)i,
+                    Dock = DockStyle.Fill, ForeColor = InkColor, AutoSize = false,
+                    AutoEllipsis = true, Margin = new Padding(0, 1, 6, 1),
+                    TextAlign = ContentAlignment.MiddleLeft };
                 mode.CheckedChanged += OnLatencyModeChanged;
                 latencyModes[i] = mode;
-                modes.Controls.Add(mode, i % 3, i / 3);
+                modes.Controls.Add(mode, i % 2, i / 2);
             }
             table.Controls.Add(modes, 0, 0);
             latencyBar = new ValueSlider { Minimum = 0, Maximum = LatencyProfile.SliderSteps,
@@ -224,8 +452,10 @@ namespace AirStereo.Ui
                 SmallChange = 10, LargeChange = 50, AccessibleName = "自定义缓冲延迟" };
             latencyBar.ValueChanged += OnLatencySlider;
             table.Controls.Add(latencyBar, 0, 1);
-            latencyValue = new Label { Dock = DockStyle.Fill, ForeColor = AccentDarkColor, AutoEllipsis = true };
-            latencyHint = new Label { Dock = DockStyle.Fill, ForeColor = MutedColor, AutoEllipsis = true };
+            latencyValue = new Label { Dock = DockStyle.Fill, ForeColor = AccentDarkColor,
+                AutoEllipsis = true, Margin = new Padding(0) };
+            latencyHint = new Label { Dock = DockStyle.Fill, ForeColor = MutedColor,
+                AutoEllipsis = true, Margin = new Padding(0) };
             table.Controls.Add(latencyValue, 0, 2);
             table.Controls.Add(latencyHint, 0, 3);
             latencyBox.Controls.Add(table);
@@ -237,6 +467,13 @@ namespace AirStereo.Ui
         {
             if (exiting || IsDisposed) return;
             if (!Visible) RestoreFromTray();
+            // The settings form is built before the main window owns a native
+            // handle.  On a high-DPI monitor its inherited font can therefore be
+            // one scale behind until it is shown.  Synchronize it at the last
+            // possible moment, before layout and painting occur.
+            if (settingsForm != null && settingsForm.Font.Size != Font.Size)
+                settingsForm.Font = Font;
+            ApplySettingsLayout(true);
             RefreshStartup();
             RefreshFaults();
             TopMost = false;
@@ -325,7 +562,14 @@ namespace AirStereo.Ui
         protected override void OnDpiChanged(DpiChangedEventArgs args)
         {
             base.OnDpiChanged(args);
-            Post(delegate { RebuildDeviceList(); PositionPopup(); });
+            Post(delegate { ApplyCompactLayout(); ApplySettingsLayout(true); RebuildDeviceList(); PositionPopup(); });
+        }
+
+        protected override void OnFontChanged(EventArgs args)
+        {
+            base.OnFontChanged(args);
+            if (compactRoot != null) ApplyCompactLayout();
+            if (settingsForm != null) settingsForm.Font = Font;
         }
 
         protected override void OnVisibleChanged(EventArgs args)
