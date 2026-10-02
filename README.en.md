@@ -2,11 +2,11 @@
 
 [中文](README.md)
 
-Windows x64 AirPlay audio sender. The current version is **1.0.2**. The official source, release, and update-check source is [Flourishze/AirStereo](https://github.com/Flourishze/AirStereo).
+Windows x64 AirPlay audio sender. The current version is **1.0.3**. The official source, release, and update-check source is [Flourishze/AirStereo](https://github.com/Flourishze/AirStereo).
 
 ## Installation and Usage
 
-Download `AirStereo-Setup-1.0.2-x64.exe` from the repository's Releases page. Exit an older version from the tray menu before installing. The installer includes the .NET Core and Windows Desktop 10.0.12 runtimes and prefers the runtimes in the installation directory. No separate .NET runtime installation is required; the operating system must still be a Windows x64 version supported by .NET 10.
+Download `AirStereo-Setup-1.0.3-x64.exe` from the repository's Releases page. Exit an older version from the tray menu before installing. The installer includes the .NET Core and Windows Desktop 10.0.12 runtimes and prefers the runtimes in the installation directory. No separate .NET runtime installation is required; the operating system must still be a Windows x64 version supported by .NET 10.
 
 1. Click the AirStereo tray icon in the lower-right corner, scan for speakers, and select the targets you want to use.
 2. Playback is disabled when nothing is selected. Selecting one independent speaker sends full stereo audio and disables the left/right balance control.
@@ -27,10 +27,12 @@ Diagnostic logs may contain speaker names, network addresses, and system informa
 
 ## Build and Documentation
 
-See the [build guide](docs/BUILD.md), [acceptance checklist](docs/TESTING.md), [changelog](CHANGELOG.md), and [1.0.2 release notes](docs/releases/v1.0.2.md). The repository includes the application source and packaging scripts. The original source for the existing installer wizard is not included, so packaging still depends on the explicitly documented binary template.
+See the [build guide](docs/BUILD.md), [acceptance checklist](docs/TESTING.md), [changelog](CHANGELOG.md), and [1.0.3 release notes](docs/releases/v1.0.3.md). The repository includes the application source and packaging scripts. The original source for the existing installer wizard is not included, so packaging still depends on the explicitly documented binary template.
 
 ## License
 
 AirStereo's own code and documentation are licensed under the [MIT License](LICENSE), Copyright (c) 2026 Flourishze. The copyright notice and license text must be retained when using, modifying, or distributing the software. The software is provided "as is", without warranty.
 
 Third-party code, dependencies, the .NET runtime, and installer binary templates remain subject to their respective licenses; this repository's MIT License does not change those terms. The .NET runtime distributed with the installer retains its original `LICENSE` and `ThirdPartyNotices` files.
+
+

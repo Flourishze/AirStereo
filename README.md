@@ -2,11 +2,11 @@
 
 [English](README.en.md)
 
-Windows x64 AirPlay 音频发送应用。当前版本 **1.0.2**，唯一发布与更新来源为 [Flourishze/AirStereo](https://github.com/Flourishze/AirStereo)。
+Windows x64 AirPlay 音频发送应用。当前版本 **1.0.3**，唯一发布与更新来源为 [Flourishze/AirStereo](https://github.com/Flourishze/AirStereo)。
 
 ## 安装与使用
 
-从本仓库 Releases 下载 `AirStereo-Setup-1.0.2-x64.exe`，安装前从托盘菜单退出旧版。安装包附带 .NET Core 与 Windows Desktop 10.0.12 运行时，优先使用安装目录内的运行时。无需另装 .NET 运行时；仍需要受 .NET 10 支持的 Windows x64 系统。
+从本仓库 Releases 下载 `AirStereo-Setup-1.0.3-x64.exe`，安装前从托盘菜单退出旧版。安装包附带 .NET Core 与 Windows Desktop 10.0.12 运行时，优先使用安装目录内的运行时。无需另装 .NET 运行时；仍需要受 .NET 10 支持的 Windows x64 系统。
 
 1. 点击右下角 AirStereo 托盘图标，扫描并勾选音响。
 2. 未选择时不能播放；选择一只独立音响时发送完整立体声，并禁用左右平衡。
@@ -27,10 +27,12 @@ Windows x64 AirPlay 音频发送应用。当前版本 **1.0.2**，唯一发布�
 
 ## 构建与文档
 
-详见 [构建说明](docs/BUILD.md)、[验收清单](docs/TESTING.md)、[更新记录](CHANGELOG.md) 和 [1.0.2 发布说明](docs/releases/v1.0.2.md)。应用源码与打包脚本提供；既有安装向导的原始源码未保留，因此打包仍依赖明确标注的二进制模板。
+详见 [构建说明](docs/BUILD.md)、[验收清单](docs/TESTING.md)、[更新记录](CHANGELOG.md) 和 [1.0.3 发布说明](docs/releases/v1.0.3.md)。应用源码与打包脚本提供；既有安装向导的原始源码未保留，因此打包仍依赖明确标注的二进制模板。
 
 ## 许可说明
 
 AirStereo 自有代码与文档采用 [MIT 许可证](LICENSE)，Copyright (c) 2026 Flourishze。使用、修改或分发时须保留版权声明与许可文本；软件按现状提供，不附带保证。
 
 第三方代码、依赖、.NET 运行时与安装器二进制模板不因本仓库采用 MIT 而变更许可，仍须遵守各自的许可条款。随安装包分发的 .NET 运行时保留其原有 LICENSE 与 ThirdPartyNotices。
+
+
