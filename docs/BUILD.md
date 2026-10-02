@@ -15,16 +15,17 @@ Windows x64；PowerShell；Visual Studio 18 Build Tools 的 Roslyn 和 C++ 工�
 ## 打包
 
 ```powershell
-.\installer\package-release.ps1 -BuildDirectory out\program -OutputDirectory out\release-1.0.2 -BuildId 1.0.2
+.\installer\package-release.ps1 -BuildDirectory out\program -OutputDirectory out\release-1.0.3 -BuildId 1.0.3
 ```
 
 要求 Visual Studio 安装的 Mono.Cecil、匹配运行时及 `installer/template/AirStereo-Setup-base.exe`。输出目录不得含既有安装包或 payload，以免覆盖历史产物。脚本保留 .NET 运行时的许可文件。打包不会自动上传 GitHub。
 
-应用版本在 `src/VersionInfo.cs`；发布时同时维护安装版本、README、CHANGELOG、发布说明及 `v1.0.2` 标签。输出安装包应先验收再发布。
+应用版本在 `src/VersionInfo.cs`；发布时同时维护安装版本、README、CHANGELOG、发布说明及 `v1.0.3` 标签。输出安装包应先验收再发布。
 
 ## 可重建范围
 
 应用和原生启动器源码完整提供。既有安装向导的原始源码未保留，模板仅含向导及独立卸载程序；脚本替换 payload、界面版本和卸载注册版本。不声称安装向导可完全从源码重建。详见 `installer/template/README.md`。
 
 运行时会话、个人配置、故障日志和产物目录不应提交或纳入源码压缩包。
+
 
