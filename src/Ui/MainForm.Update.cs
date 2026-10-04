@@ -18,10 +18,16 @@ namespace AirStereo.Ui
             panel.BackColor = CanvasColor;
             panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
             panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-            updateButton = NewButton("检查更新 · " + VersionInfo.Current, 180, Glyph.Refresh);
+            updateButton = NewButton((PackageEnvironment.IsPackaged ? "商店更新 · " : "检查更新 · ") + VersionInfo.Current, 180, Glyph.Refresh);
             updateButton.Dock = DockStyle.Fill;
             updateButton.Click += async delegate
             {
+                if (PackageEnvironment.IsPackaged)
+                {
+                    try { Process.Start(new ProcessStartInfo(PackageEnvironment.StoreUpdatesUri) { UseShellExecute = true }); }
+                    catch (Exception) { updateStatus.Text = "无法打开 Microsoft Store，请在商店的下载页面检查更新"; }
+                    return;
+                }
                 updateButton.Enabled = false;
                 updateDownload.Enabled = false;
                 updateStatus.Text = "正在检查 GitHub 正式版本…";
@@ -45,11 +51,12 @@ namespace AirStereo.Ui
                     if (!IsDisposed && updateButton != null && !updateButton.IsDisposed) updateButton.Enabled = true;
                 }
             };
-            updateDownload = NewButton("查看更新与下载", 180, Glyph.Export);
+            updateDownload = NewButton(PackageEnvironment.IsPackaged ? "查看项目说明" : "查看更新与下载", 180, Glyph.Export);
             updateDownload.Dock = DockStyle.Fill;
-            updateDownload.Enabled = false;
+            updateDownload.Enabled = PackageEnvironment.IsPackaged;
             updateDownload.Click += delegate
             {
+                if (PackageEnvironment.IsPackaged) updatePage = VersionInfo.Repository;
                 if (string.IsNullOrEmpty(updatePage)) return;
                 try { Process.Start(new ProcessStartInfo(updatePage) { UseShellExecute = true }); }
                 catch (Exception) { updateStatus.Text = "无法打开浏览器，请稍后重试"; }

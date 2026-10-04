@@ -1,6 +1,6 @@
 # AirStereo
 
-[English](README.en.md)
+[English](../README.en.md)
 
 <a href="https://apps.microsoft.com/detail/9nmx9h3gbgj4?referrer=appbadge&mode=full" target="_blank"  rel="noopener noreferrer">
 	<img src="https://get.microsoft.com/images/zh-cn%20dark.svg" width="200"/>
@@ -34,11 +34,11 @@ Windows x64 AirPlay 音频发送应用。当前版本 **1.0.4**，源码与独�
 | 故障排查 | 查看连接故障、运行日志并打开本地 Diagnostics 文件夹 |
 | 版本检查 | 手动检查本仓库正式版本，打开 Release 页面获取更新 |
 
-[下载安装包](https://github.com/Flourishze/AirStereo/releases) · [问题反馈 / 功能建议](https://github.com/Flourishze/AirStereo/issues) · [更新记录](CHANGELOG.md)
+[下载安装包](https://github.com/Flourishze/AirStereo/releases) · [问题反馈 / 功能建议](https://github.com/Flourishze/AirStereo/issues) · [更新记录](../CHANGELOG.md)
 
 ## 界面预览
 
-![AirStereo 音响列表与音频设置总览](docs/images/airstereo-overview-zh-cn.png)
+![AirStereo 音响列表与音频设置总览](images/airstereo-overview-zh-cn.png)
 
 实际界面离线预览：设备名称与地址为演示数据，不代表真实设备连接。
 
@@ -82,11 +82,11 @@ EXE 提供安装向导，MSI 适合部署。商店版请使用上方 Microsoft S
 
 ## 构建与文档
 
-详见 [构建说明](docs/BUILD.md)、[验收清单](docs/TESTING.md)、[更新记录](CHANGELOG.md) 和 [1.0.4 发布说明](docs/releases/v1.0.4.md)。应用源码与打包脚本提供；既有安装向导的原始源码未保留，因此打包仍依赖明确标注的二进制模板。
+详见 [构建说明](BUILD.md)、[验收清单](TESTING.md)、[更新记录](../CHANGELOG.md) 和 [1.0.4 发布说明](releases/v1.0.4.md)。应用源码与打包脚本提供；既有安装向导的原始源码未保留，因此打包仍依赖明确标注的二进制模板。
 
 ## 许可说明
 
-AirStereo 自有代码与文档采用 [MIT 许可证](LICENSE)，Copyright (c) 2026 Flourishze。使用、修改或分发时须保留版权声明与许可文本；软件按现状提供，不附带保证。
+AirStereo 自有代码与文档采用 [MIT 许可证](../LICENSE)，Copyright (c) 2026 Flourishze。使用、修改或分发时须保留版权声明与许可文本；软件按现状提供，不附带保证。
 
 第三方代码、依赖、.NET 运行时与安装器二进制模板不因本仓库采用 MIT 而变更许可，仍须遵守各自的许可条款。随安装包分发的 .NET 运行时保留其原有 LICENSE 与 ThirdPartyNotices。
 

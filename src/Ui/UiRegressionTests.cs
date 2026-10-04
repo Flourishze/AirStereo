@@ -68,6 +68,44 @@ namespace AirStereo.Ui
 
         private static void Verify(Action<string, bool, string> check)
         {
+            // Exercise the first-launch path without showing a window, loading user
+            // settings, scanning receivers, or starting audio. No prior tray action
+            // should be required before a loss of focus schedules dismissal.
+            using (MainForm popup = new MainForm())
+            {
+                popup.OfflinePreview = true;
+                IntPtr handle = popup.Handle;
+                // A hidden WinForms handle can still acquire focus in the isolated
+                // test desktop. Disable it to model focus having moved elsewhere.
+                popup.Enabled = false;
+                System.Windows.Forms.Timer timer = (System.Windows.Forms.Timer)Field(popup, "dismissTimer");
+                try
+                {
+                    popup.OfflinePreview = false;
+                    typeof(MainForm).GetMethod("OnDeactivate", Private).Invoke(popup, new object[] { EventArgs.Empty });
+                    bool dismissalScheduled = false;
+                    // Snapshot immediately after the queued deactivate callback,
+                    // before DoEvents can also process the 150 ms timer tick.
+                    popup.BeginInvoke(new Action(() =>
+                    {
+                        dismissalScheduled = timer.Enabled;
+                        timer.Stop();
+                    }));
+                    Application.DoEvents();
+                    check("UI first launch schedules dismissal on focus loss without prior tray actions",
+                        dismissalScheduled, "ContainsFocus=" + popup.ContainsFocus +
+                        "; ActiveFormIsPopup=" + (Form.ActiveForm == popup));
+                }
+                finally
+                {
+                    timer.Stop();
+                    popup.OfflinePreview = true;
+                }
+                Call(popup, "HideToTray");
+                check("UI hiding cancels pending dismissal and retains the tray icon",
+                    !timer.Enabled && ((NotifyIcon)Field(popup, "trayIcon")).Visible, null);
+            }
+
             using (MainForm form = new MainForm())
             {
                 Receiver a = Speaker("卧室", 1), b = Speaker("卧室 (2)", 2), c = Speaker("厨房", 3);
@@ -533,6 +571,13 @@ namespace AirStereo.Ui
             check("diagnostics falls back when the install directory cannot be written", denied.IsFallback &&
                 File.Exists(Path.Combine(fallback, "faults.jsonl")) && denied.StorageError.Length == 0, null);
             string command = StartupService.Command(root, @"C:\Program Files\dotnet\dotnet.exe");
+            check("MSIX diagnostics avoids the immutable install directory",
+                PackageEnvironment.DiagnosticDirectory(root, fallback, true) == Path.Combine(fallback, "Diagnostics"), null);
+            check("unpackaged diagnostics retains the installation directory",
+                PackageEnvironment.DiagnosticDirectory(root, fallback, false) == Path.Combine(root, "Diagnostics"), null);
+            check("unpackaged app data path remains compatible with existing settings",
+                PackageEnvironment.IsPackaged || PackageEnvironment.DataDirectory ==
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AirStereo"), null);
             check("startup command quotes paths and launches tray only", command.Contains("\" gui --tray") &&
                 command.StartsWith("\"C:\\Program Files\\dotnet\\dotnet.exe\""), null);
             using (ValueSlider slider = new ValueSlider { Minimum = -100, Maximum = 100, Value = 0, SmallChange = 5 })

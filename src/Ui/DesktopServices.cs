@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Text.Json;
+using System.Runtime.InteropServices;
 using Microsoft.Win32;
 
 namespace AirStereo.Ui
@@ -10,6 +11,12 @@ namespace AirStereo.Ui
     internal static class StartupService
     {
         private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
+        [DllImport("AirStereo.Store.dll")]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.AssemblyDirectory | DllImportSearchPath.System32)]
+        private static extern int AirStereoStartupState(out int state);
+        [DllImport("AirStereo.Store.dll")]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.AssemblyDirectory | DllImportSearchPath.System32)]
+        private static extern int AirStereoSetStartup(int enabled, out int state);
         internal static string Command(string directory, string host)
         {
             string exe = Path.Combine(directory, "AirStereo.exe");
@@ -21,6 +28,11 @@ namespace AirStereo.Ui
         {
             get
             {
+                if (PackageEnvironment.IsPackaged)
+                {
+                    Marshal.ThrowExceptionForHR(AirStereoStartupState(out int state));
+                    return state == 3 || state == 4; // Enabled / EnabledByPolicy
+                }
                 using (RegistryKey key = Registry.CurrentUser.OpenSubKey(RunKey))
                     return key?.GetValue("AirStereo") is string command && command.Length > 0;
             }
@@ -28,6 +40,17 @@ namespace AirStereo.Ui
 
         public static void SetEnabled(bool enabled)
         {
+            if (PackageEnvironment.IsPackaged)
+            {
+                Marshal.ThrowExceptionForHR(AirStereoSetStartup(enabled ? 1 : 0, out int state));
+                if (enabled && state != 3 && state != 4)
+                    throw new InvalidOperationException(state == 1 ?
+                        "启动项已在 Windows 中关闭，请到“设置 → 应用 → 启动”手动启用 AirStereo。" :
+                        "Windows 策略禁止启用启动项。");
+                if (!enabled && (state == 3 || state == 4))
+                    throw new InvalidOperationException("Windows 策略不允许关闭此启动项。");
+                return;
+            }
             using (RegistryKey key = Registry.CurrentUser.CreateSubKey(RunKey))
             {
                 if (enabled) key.SetValue("AirStereo", Command(AppContext.BaseDirectory, Environment.ProcessPath), RegistryValueKind.String);
@@ -59,8 +82,8 @@ namespace AirStereo.Ui
         public string StorageError { get; private set; } = "";
         public bool IsFallback => !string.Equals(DirectoryPath, preferredDirectory, StringComparison.OrdinalIgnoreCase);
         public static FaultStore Default { get; } = new FaultStore(
-            Path.Combine(AppContext.BaseDirectory, "Diagnostics"),
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AirStereo", "Diagnostics"));
+            PackageEnvironment.DiagnosticDirectory(AppContext.BaseDirectory, PackageEnvironment.DataDirectory, PackageEnvironment.IsPackaged),
+            Path.Combine(PackageEnvironment.DataDirectory, "Diagnostics"));
 
         internal FaultStore(string preferred, string fallback)
         {

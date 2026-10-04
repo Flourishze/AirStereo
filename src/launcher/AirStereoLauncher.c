@@ -18,33 +18,6 @@
 #include <wchar.h>
 
 #define TEXT_LIMIT 4096
-#define SINGLE_INSTANCE_MUTEX L"Local\\AirStereo.Launcher.SingleInstance.1"
-#define AIRSTEREO_WINDOW_TITLE L"AirStereo · 立体声 AirPlay 发送器"
-
-static BOOL IsGuiLaunch(PWSTR commandLine)
-{
-    if (commandLine == NULL || commandLine[0] == L'\0') return TRUE;
-    while (*commandLine == L' ' || *commandLine == L'\t') commandLine++;
-    return _wcsicmp(commandLine, L"gui") == 0 || _wcsicmp(commandLine, L"window") == 0 ||
-        _wcsicmp(commandLine, L"gui --tray") == 0;
-}
-
-static BOOL ActivateExistingWindow(void)
-{
-    for (int attempt = 0; attempt < 20; attempt++)
-    {
-        HWND window = FindWindowW(NULL, AIRSTEREO_WINDOW_TITLE);
-        if (window != NULL)
-        {
-            if (IsIconic(window)) ShowWindowAsync(window, SW_RESTORE);
-            ShowWindowAsync(window, SW_SHOW);
-            SetForegroundWindow(window);
-            return TRUE;
-        }
-        Sleep(50);
-    }
-    return FALSE;
-}
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous, PWSTR commandLine, int showCommand)
 {
@@ -52,46 +25,29 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous, PWSTR commandLine, i
     (void)previous;
     (void)showCommand;
 
-    HANDLE singleInstance = NULL;
-    if (IsGuiLaunch(commandLine))
-    {
-        singleInstance = CreateMutexW(NULL, TRUE, SINGLE_INSTANCE_MUTEX);
-        if (singleInstance == NULL) return 1;
-        if (GetLastError() == ERROR_ALREADY_EXISTS)
-        {
-            ActivateExistingWindow();
-            CloseHandle(singleInstance);
-            return 0;
-        }
-    }
-
     wchar_t module[TEXT_LIMIT];
     DWORD length = GetModuleFileNameW(NULL, module, TEXT_LIMIT);
     if (length == 0 || length >= TEXT_LIMIT)
-    {
-        if (singleInstance != NULL) CloseHandle(singleInstance);
         return 1;
-    }
 
     wchar_t directory[TEXT_LIMIT];
     wcsncpy_s(directory, TEXT_LIMIT, module, TEXT_LIMIT - 1);
     wchar_t *slash = wcsrchr(directory, L'\\');
     if (slash == NULL)
-    {
-        if (singleInstance != NULL) CloseHandle(singleInstance);
         return 1;
-    }
     *slash = L'\0';
 
+#ifdef AIRSTEREO_STARTUP
+    // Windows startup-task launches stay in the tray; direct launches show the panel.
+    const wchar_t *arguments = (commandLine != NULL && commandLine[0] != L'\0') ? commandLine : L"gui --tray";
+#else
     const wchar_t *arguments = (commandLine != NULL && commandLine[0] != L'\0') ? commandLine : L"gui";
+#endif
 
     /* Installed packages carry their matching runtime. Development builds still use PATH. */
     wchar_t host[TEXT_LIMIT];
     if (_snwprintf_s(host, TEXT_LIMIT, _TRUNCATE, L"%ls\\dotnet.exe", directory) < 0)
-    {
-        if (singleInstance != NULL) CloseHandle(singleInstance);
         return 1;
-    }
     DWORD hostAttributes = GetFileAttributesW(host);
     if (hostAttributes == INVALID_FILE_ATTRIBUTES || (hostAttributes & FILE_ATTRIBUTE_DIRECTORY))
         wcscpy_s(host, TEXT_LIMIT, L"dotnet.exe");
@@ -99,10 +55,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous, PWSTR commandLine, i
     wchar_t command[TEXT_LIMIT * 2];
     if (_snwprintf_s(command, TEXT_LIMIT * 2, _TRUNCATE,
             L"\"%ls\" \"%ls\\AirStereo.dll\" %ls", host, directory, arguments) < 0)
-    {
-        if (singleInstance != NULL) CloseHandle(singleInstance);
         return 1;
-    }
 
     STARTUPINFOW startup;
     PROCESS_INFORMATION process;
@@ -134,7 +87,6 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous, PWSTR commandLine, i
     if (!CreateProcessW(NULL, command, NULL, NULL, FALSE, flags, NULL, directory, &startup, &process))
     {
         if (job != NULL) CloseHandle(job);
-        if (singleInstance != NULL) CloseHandle(singleInstance);
         MessageBoxW(NULL,
             L"\u627e\u4e0d\u5230 dotnet.exe\u3002\u8bf7\u5b89\u88c5\u5f53\u524d\u7248\u672c\u7684 .NET \u684c\u9762\u8fd0\u884c\u65f6\uff08Windows Desktop Runtime\uff09\u3002",
             L"AirStereo", MB_OK | MB_ICONERROR);
@@ -154,6 +106,5 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous, PWSTR commandLine, i
     /* The job handle is held for the whole run on purpose: KILL_ON_JOB_CLOSE only fires once
        the last handle goes away, which is the signal that this stub is gone too. */
     if (job != NULL) CloseHandle(job);
-    if (singleInstance != NULL) CloseHandle(singleInstance);
     return (int)code;
 }

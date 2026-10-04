@@ -141,6 +141,15 @@ namespace AirStereo
             bool identical = passthrough.ProducedFrames == 4;
             for (int i = 0; i < 8 && identical; i++) identical = passthrough.Produced[i] == block[i];
             Check("equal rates are passed through without filtering", identical);
+
+            // A delayed or malformed capture callback must not be able to make the live
+            // resampler allocate in proportion to the callback size.
+            float[] oversized = new float[200000 * 2];
+            resampler.Reset();
+            resampler.Push(oversized, 200000);
+            Check("resampler bounds an oversized capture callback",
+                resampler.PendingInputFrames <= 8192 && resampler.ProducedFrames <= 16384,
+                "pending=" + resampler.PendingInputFrames + ", produced=" + resampler.ProducedFrames);
         }
 
         private static void Rfc8439BlockFunction()

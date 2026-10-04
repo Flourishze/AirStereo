@@ -21,6 +21,12 @@ namespace AirStereo.Audio
         public const int HalfTaps = 16;
         private const int Phases = 1024;
         private const int KernelLength = HalfTaps * 2;
+        // A live WASAPI source normally contributes one 10 ms block at a time.  Keeping a
+        // bounded recovery window is important here: if the capture thread is stalled or the
+        // endpoint reports a malformed packet, an unbounded resampler array can turn one audio
+        // glitch into gigabytes of committed managed memory.
+        private const int MaxPendingFrames = 8192;
+        private const int MaxProducedFrames = 16384;
         /// <summary>The largest rate trim the caller may ask for, 1500 ppm or 0.15%.</summary>
         public const double MaxTrim = 0.0015;
 
@@ -111,9 +117,11 @@ namespace AirStereo.Audio
 
             if (passthrough)
             {
-                if (produced.Length < frames * 2) produced = new float[frames * 2];
-                Array.Copy(interleaved, 0, produced, 0, frames * 2);
-                producedFrames = frames;
+                int accepted = Math.Min(frames, MaxProducedFrames);
+                if (produced.Length < accepted * 2) produced = new float[accepted * 2];
+                int passthroughOffset = (frames - accepted) * 2;
+                Array.Copy(interleaved, passthroughOffset, produced, 0, accepted * 2);
+                producedFrames = accepted;
                 return;
             }
 
@@ -121,20 +129,52 @@ namespace AirStereo.Audio
             // device hands us ten milliseconds every time, so the buffer is compacted on every
             // call instead of growing.
             DropConsumed(0);
+            int sourceOffset = 0;
+            if (frames > MaxPendingFrames)
+            {
+                sourceOffset = (frames - MaxPendingFrames) * 2;
+                frames = MaxPendingFrames;
+            }
+            if (pendingFrames + frames > MaxPendingFrames)
+            {
+                // Preserve the newest audio.  The old samples are already late and retaining
+                // them only increases latency; a bounded drop is preferable to an allocation
+                // that grows with every missed capture callback.
+                int discard = pendingFrames + frames - MaxPendingFrames;
+                DropFront(discard);
+            }
             EnsurePending(pendingFrames + frames);
-            Array.Copy(interleaved, 0, pending, pendingFrames * 2, frames * 2);
+            Array.Copy(interleaved, sourceOffset, pending, pendingFrames * 2, frames * 2);
             pendingFrames += frames;
             Convert();
         }
 
         private void EnsurePending(int frames)
         {
+            if (frames > MaxPendingFrames) frames = MaxPendingFrames;
             if (pending.Length >= frames * 2) return;
             int size = pending.Length;
-            while (size < frames * 2) size *= 2;
+            while (size < frames * 2 && size < MaxPendingFrames * 2) size *= 2;
+            if (size > MaxPendingFrames * 2) size = MaxPendingFrames * 2;
             float[] grown = new float[size];
             Array.Copy(pending, 0, grown, 0, pendingFrames * 2);
             pending = grown;
+        }
+
+        private void DropFront(int frames)
+        {
+            if (frames <= 0) return;
+            if (frames >= pendingFrames)
+            {
+                pendingFrames = 0;
+                position = 0.0;
+                return;
+            }
+            int keep = pendingFrames - frames;
+            Array.Copy(pending, frames * 2, pending, 0, keep * 2);
+            pendingFrames = keep;
+            position -= frames;
+            if (position < 0.0) position = 0.0;
         }
 
         private void DropConsumed(int keepMinimum)
@@ -154,16 +194,18 @@ namespace AirStereo.Audio
             if (limit < 0) return;
 
             int needed = (int)(pendingFrames / Math.Max(step, 0.25)) + 4;
+            if (needed > MaxProducedFrames) needed = MaxProducedFrames;
             if (produced.Length < needed * 2)
             {
                 int size = produced.Length;
-                while (size < needed * 2) size *= 2;
+                while (size < needed * 2 && size < MaxProducedFrames * 2) size *= 2;
+                if (size > MaxProducedFrames * 2) size = MaxProducedFrames * 2;
                 produced = new float[size];
             }
 
             int count = 0;
             int available = pendingFrames * 2;
-            while ((int)position <= limit)
+            while ((int)position <= limit && count < MaxProducedFrames)
             {
                 int index = (int)position;
                 int phase = (int)((position - index) * Phases);

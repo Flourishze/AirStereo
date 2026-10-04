@@ -3,7 +3,8 @@ param(
     [switch]$Run,
     [switch]$Shortcut,
     [string]$Arguments = 'gui',
-    [string]$OutputDir = 'dist'
+    [string]$OutputDir = 'dist',
+    [string]$ObjectDir = 'obj'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -160,7 +161,7 @@ function Build-Launcher([string]$OutputDirectory) {
     $sdkInclude = Join-Path 'C:\Program Files (x86)\Windows Kits\10\Include' $sdkLib.Name
     if (-not (Test-Path $link) -or -not $sdkLib -or -not (Test-Path $sdkInclude)) { return $null }
 
-    $objectDirectory = Join-Path $root 'obj'
+    $objectDirectory = Join-Path $root $ObjectDir
     New-Item -ItemType Directory -Force -Path $objectDirectory | Out-Null
     $objectFile = Join-Path $objectDirectory 'AirStereoLauncher.obj'
     $iconFile = Join-Path $objectDirectory 'AirStereo.ico'
@@ -173,7 +174,21 @@ function Build-Launcher([string]$OutputDirectory) {
     $hasResource = $false
     if ($resourceCompiler -and (Build-LauncherIcon $iconFile)) {
         $iconResourcePath = $iconFile.Replace('\', '/')
-        Set-Content -Path $resourceSource -Encoding ASCII -Value ("1 ICON `"" + $iconResourcePath + "`"")
+        $versionSource = Get-Content -LiteralPath (Join-Path $root 'src\VersionInfo.cs') -Raw
+        $appVersion = [regex]::Match($versionSource, 'Current = "(\d+\.\d+\.\d+)"').Groups[1].Value
+        if (-not $appVersion) { throw 'Application version is missing.' }
+        $versionTuple = $appVersion.Replace('.', ',') + ',0'
+        $resourceLines = @(
+            ('1 ICON "' + $iconResourcePath + '"'),
+            '1 VERSIONINFO', ('FILEVERSION ' + $versionTuple), ('PRODUCTVERSION ' + $versionTuple),
+            'FILEFLAGSMASK 0x3fL', 'FILEFLAGS 0x0L', 'FILEOS 0x40004L', 'FILETYPE 0x1L',
+            'BEGIN', 'BLOCK "StringFileInfo"', 'BEGIN', 'BLOCK "040904b0"', 'BEGIN',
+            ('VALUE "FileVersion", "' + $appVersion + '.0"'),
+            ('VALUE "ProductVersion", "' + $appVersion + '"'),
+            'VALUE "ProductName", "AirStereo"', 'VALUE "FileDescription", "AirStereo launcher"',
+            'END', 'END', 'BLOCK "VarFileInfo"', 'BEGIN', 'VALUE "Translation", 0x409, 1200', 'END', 'END'
+        )
+        Set-Content -Path $resourceSource -Encoding ASCII -Value $resourceLines
         & $resourceCompiler.FullName /nologo "/fo$resourceFile" $resourceSource | Out-Null
         if ($LASTEXITCODE -eq 0 -and (Test-Path $resourceFile) -and (Get-Item $resourceFile).Length -gt 0) {
             $hasResource = $true
@@ -196,7 +211,7 @@ function Build-Launcher([string]$OutputDirectory) {
             (Join-Path $sdkLib.FullName 'um\x64'),
             (Join-Path $sdkLib.FullName 'ucrt\x64')) -join ';'
 
-        & $cl.FullName /nologo /c /O2 /MT /W3 "/Fo:$objectFile" $source | Out-Null
+        & $cl.FullName /nologo /c /O2 /MT /W3 /utf-8 "/Fo:$objectFile" $source | Out-Null
         if ($LASTEXITCODE -ne 0) { return $null }
 
         $linkInputs = @($objectFile)

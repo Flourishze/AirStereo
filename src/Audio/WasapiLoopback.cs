@@ -258,6 +258,12 @@ namespace AirStereo.Audio
         /// <summary>Above this the depth stops being a cushion and the drift loop drains it.</summary>
         private const double QueueCeilingMilliseconds = 40.0;
         private const double QueueFloorMilliseconds = 10.0;
+        // The normal queue is 10-40 ms.  Keep a finite recovery window for a blocked or
+        // disconnected endpoint so a capture outage cannot retain an ever-growing Queue<T>.
+        private const double MaximumQueueMilliseconds = 2000.0;
+        // WASAPI normally returns a few hundred frames.  Do not let a corrupt/device-specific
+        // packet size turn the staging buffer into an unbounded allocation before resampling.
+        private const int MaximumCaptureCallbackFrames = 96000;
 
         public sealed class Description
         {
@@ -677,7 +683,7 @@ namespace AirStereo.Audio
         private void Convert(uint frames, IntPtr data, int stride)
         {
             bool silence = data == IntPtr.Zero;
-            int count = (int)frames;
+            int count = (int)Math.Min(frames, (uint)MaximumCaptureCallbackFrames);
             if (staging.Length < count * 2) staging = new float[count * 2];
             for (int frame = 0; frame < count; frame++)
             {
@@ -705,6 +711,7 @@ namespace AirStereo.Audio
                     output.Enqueue(ToSample(produced[i * 2]));
                     output.Enqueue(ToSample(produced[i * 2 + 1]));
                 }
+                TrimQueueToLimit();
                 depth = output.Count;
                 if (depth > queueCeiling) queueCeiling = depth;
             }
@@ -712,6 +719,23 @@ namespace AirStereo.Audio
             // Convert runs once per captured packet, so this is also the natural heartbeat for
             // a reader that is waiting for the next block.
             dataReady.Set();
+        }
+
+        private void TrimQueueToLimit()
+        {
+            int maximumSamples = (int)Math.Max(2.0,
+                Math.Round(MaximumQueueMilliseconds * SampleRate / 1000.0)) * 2;
+            int excess = output.Count - maximumSamples;
+            if (excess <= 0) return;
+
+            // Drop complete frames from the old end and keep the freshest audio.  Timestamps
+            // are one per frame, while output contains two samples per frame.
+            int frames = (excess + 1) / 2;
+            for (int i = 0; i < frames; i++)
+            {
+                if (output.Count >= 2) { output.Dequeue(); output.Dequeue(); }
+                if (stamps.Count > 0) stamps.Dequeue();
+            }
         }
 
         /// <summary>
@@ -782,9 +806,12 @@ namespace AirStereo.Audio
 
         private static float Read24(IntPtr pointer)
         {
-            byte[] bytes = new byte[3];
-            Marshal.Copy(pointer, bytes, 0, 3);
-            int value = bytes[0] | (bytes[1] << 8) | (bytes[2] << 16);
+            // Marshal.Copy(byte[3]) allocated for every 24-bit sample.  At 48 kHz that is a
+            // large, unnecessary stream of short-lived arrays and can keep the GC under
+            // constant pressure during long playback sessions.
+            int value = Marshal.ReadByte(pointer) |
+                (Marshal.ReadByte(pointer, 1) << 8) |
+                (Marshal.ReadByte(pointer, 2) << 16);
             if ((value & 0x800000) != 0) value |= unchecked((int)0xFF000000);
             return value / 8388608f;
         }

@@ -115,6 +115,7 @@ namespace AirStereo.Ui
             AutoScaleDimensions = new SizeF(96F, 96F);
             AutoScaleMode = AutoScaleMode.Dpi;
             ClientSize = new Size(410, 508);
+            MinimumSize = new Size(410, 340);
             FormBorderStyle = FormBorderStyle.None;
             ShowInTaskbar = false;
             TopMost = true;
@@ -176,7 +177,15 @@ namespace AirStereo.Ui
                     if (args.ExceptionObject is Exception error)
                         FaultStore.Default.Record("未处理异常", error.Message, error.ToString(), "进程即将退出");
                 };
-                Application.Run(new MainForm { StartInTray = startInTray });
+                // Show the borderless popup explicitly before entering the message loop.
+                // Application.Run(Form) normally does this itself, but a tray-only form
+                // with no taskbar button can otherwise remain at its construction state
+                // on some Windows/.NET combinations. The explicit show also gives
+                // NotifyIcon a native owner window before the first scan starts.
+                MainForm form = new MainForm { StartInTray = startInTray };
+                form.Show();
+                if (!startInTray) form.Activate();
+                Application.Run(form);
                 return 0;
             }
             catch (Exception error)
@@ -280,7 +289,19 @@ namespace AirStereo.Ui
                 dismissTimer.Stop();
                 if (Visible) HideToTray(); else RestoreFromTray();
             };
+            // NotifyIcon can be created before the form owns a handle. Setting Visible
+            // explicitly after the icon/menu are attached avoids a silent tray entry on
+            // machines where Explorer is still rebuilding the notification area.
             trayIcon.Visible = true;
+        }
+
+        private void EnsurePopupSize()
+        {
+            int dpi = Math.Max(96, DeviceDpi);
+            int width = Math.Max(410, (int)Math.Round(410 * dpi / 96.0));
+            int height = Math.Max(340, (int)Math.Round(340 * dpi / 96.0));
+            if (Width < width || Height < height)
+                ClientSize = new Size(width, Math.Max(height, (int)Math.Round(508 * dpi / 96.0)));
         }
 
         protected override void OnResize(EventArgs arguments)
@@ -808,6 +829,12 @@ namespace AirStereo.Ui
             titleFont = SafeBold(Font, Font.Size);
             KeyDown += OnKeyDown;
             LoadSettings();
+            // This is a borderless tray popup, so an invalid pre-handle DPI or a stale
+            // layout pass must never leave it at a tiny fallback size. Re-apply a usable
+            // minimum immediately before the first scan/display cycle.
+            MinimumSize = new Size(Math.Max(410, (int)Math.Round(410 * Math.Max(96, DeviceDpi) / 96.0)),
+                Math.Max(340, (int)Math.Round(340 * Math.Max(96, DeviceDpi) / 96.0)));
+            UpdateCompactSize();
             PositionPopup();
             BeginScan();
         }
@@ -821,6 +848,7 @@ namespace AirStereo.Ui
 
         protected override void OnFormClosing(FormClosingEventArgs arguments)
         {
+            if (!OfflinePreview) FaultStore.Default.Activity("窗口生命周期：OnFormClosing，原因=" + arguments.CloseReason);
             if (!exiting && arguments.CloseReason == CloseReason.UserClosing)
             {
                 arguments.Cancel = true;
@@ -840,6 +868,7 @@ namespace AirStereo.Ui
 
         protected override void Dispose(bool disposing)
         {
+            if (disposing && !OfflinePreview) FaultStore.Default.Activity("窗口生命周期：Dispose");
             if (disposing)
             {
                 if (dismissTimer != null) dismissTimer.Dispose();
@@ -1641,6 +1670,10 @@ namespace AirStereo.Ui
                 if (logBox.TextLength > 400000)
                 {
                     logBox.Text = logBox.Text.Substring(logBox.TextLength - 200000);
+                    // TextBoxBase keeps an undo snapshot when Text is replaced.  The log is a
+                    // rolling diagnostic view, so retaining every discarded snapshot becomes a
+                    // second unbounded history while the app is hidden in the tray.
+                    logBox.ClearUndo();
                 }
                 logBox.SelectionStart = logBox.TextLength;
                 logBox.ScrollToCaret();
@@ -1681,13 +1714,13 @@ namespace AirStereo.Ui
         {
             try
             {
-                string directory = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AirStereo");
+                string directory = PackageEnvironment.DataDirectory;
                 Directory.CreateDirectory(directory);
                 return Path.Combine(directory, "settings.txt");
             }
             catch (Exception)
             {
+                if (PackageEnvironment.IsPackaged) throw;
                 return Path.Combine(AppContext.BaseDirectory, "settings.txt");
             }
         }
@@ -1696,13 +1729,13 @@ namespace AirStereo.Ui
         {
             try
             {
-                string directory = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AirStereo");
+                string directory = PackageEnvironment.DataDirectory;
                 Directory.CreateDirectory(directory);
                 return Path.Combine(directory, "activity.log");
             }
             catch (Exception)
             {
+                if (PackageEnvironment.IsPackaged) throw;
                 return Path.Combine(AppContext.BaseDirectory, "activity.log");
             }
         }

@@ -35,23 +35,27 @@ namespace AirStereo.Ui
             grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             startupBox = new CheckBox { Text = "登录 Windows 后自动启动", Dock = DockStyle.Fill,
                 ForeColor = InkColor, AccessibleName = "开机自启", AutoEllipsis = true };
-            startupBox.CheckedChanged += delegate
+            startupBox.CheckedChanged += async delegate
             {
                 if (startupSyncing || OfflinePreview) return;
-                try { StartupService.SetEnabled(startupBox.Checked); }
+                bool enabled = startupBox.Checked;
+                startupBox.Enabled = false;
+                try { await Task.Run(() => StartupService.SetEnabled(enabled)); }
                 catch (Exception error)
                 {
+                    if (IsDisposed || startupBox.IsDisposed) return;
                     RecordFault("启动项", error.Message, error);
-                    RefreshStartup();
                     MessageBox.Show(settingsForm, "无法修改启动项：" + error.Message, "AirStereo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
+                finally { await RefreshStartupAsync(); }
             };
             grid.Controls.Add(startupBox, 0, 0);
             grid.Controls.Add(new Label { Text = ".NET " + Environment.Version + " · " +
                 System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
                 Dock = DockStyle.Fill, ForeColor = MutedColor, AutoEllipsis = true }, 0, 1);
             grid.Controls.Add(BuildUpdatePanel(), 0, 2);
-            updateStatus = new Label { Text = "更新来源：Flourishze/AirStereo 正式 Release", Dock = DockStyle.Fill,
+            updateStatus = new Label { Text = PackageEnvironment.IsPackaged ?
+                "MSIX 版由 Microsoft Store 管理更新" : "更新来源：Flourishze/AirStereo 正式 Release", Dock = DockStyle.Fill,
                 ForeColor = MutedColor, AutoEllipsis = true };
             grid.Controls.Add(updateStatus, 0, 3);
             page.Controls.Add(grid);
@@ -110,12 +114,34 @@ namespace AirStereo.Ui
             return page;
         }
 
-        private void RefreshStartup()
+        private async void RefreshStartup()
         {
-            if (OfflinePreview) return;
+            await RefreshStartupAsync();
+        }
+
+        private async Task RefreshStartupAsync()
+        {
+            if (OfflinePreview || startupBox == null || startupBox.IsDisposed || startupSyncing) return;
             startupSyncing = true;
-            try { startupBox.Checked = StartupService.Enabled; }
-            catch (Exception error) { startupBox.Enabled = false; RecordFault("启动项", error.Message, error); }
+            startupBox.Enabled = false;
+            try
+            {
+                bool enabled = await Task.Run(() => StartupService.Enabled);
+                if (IsDisposed || startupBox.IsDisposed) return;
+                startupBox.Checked = enabled;
+                startupBox.Enabled = true;
+                uiTips.SetToolTip(startupBox, PackageEnvironment.IsPackaged ?
+                    "使用 Windows 启动任务；系统中关闭的启动项须在 Windows 设置里重新启用。" : "登录 Windows 后启动到托盘");
+            }
+            catch (Exception error)
+            {
+                if (!IsDisposed && !startupBox.IsDisposed)
+                {
+                    startupBox.Enabled = false;
+                    uiTips.SetToolTip(startupBox, error.Message);
+                    RecordFault("启动项", error.Message, error);
+                }
+            }
             finally { startupSyncing = false; }
         }
 

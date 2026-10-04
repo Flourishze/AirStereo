@@ -83,6 +83,9 @@ try {
         })
     }
     $buildInfo | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $payload 'BuildInfo.json') -Encoding UTF8
+    foreach ($licenseName in @('LICENSE', 'README.md', 'README.en.md')) {
+        Copy-Item -LiteralPath (Join-Path $root $licenseName) -Destination (Join-Path $payload ('AirStereo-' + $licenseName))
+    }
     # Avoid a PowerShell here-string here: on some localized PowerShell hosts the
     # UTF-8 script is tokenized incorrectly when the closing marker follows CJK
     # text.  Joining ordinary interpolated lines produces the same release notes.
@@ -94,7 +97,7 @@ try {
         "保留单设备完整立体声、自选双设备 L/R 与原生配对音频链路，以及 EQ、平衡和测试音。"
         ""
         "安装前请从右下角托盘菜单退出旧版。可选择原目录进行覆盖安装。"
-        "发布前建议：反复勾选/取消；检查四个设置页与均衡器；播放期间打开/关闭设置；再进行真实音响连接与播放。"
+        "本版改进：采集与重采样缓冲上限、滚动日志撤销历史清理、首次打开托盘窗口后点击桌面自动收回。"
         "故障记录保存在软件目录 Diagnostics；目录不可写时回退到当前用户的本地应用数据目录。"
         "可在设置的故障记录页查看，并直接打开实际存储目录。"
         ""
@@ -152,6 +155,8 @@ try {
     $assembly.Name.Version = [version]($BuildId + '.0')
     $assembly.Write($installer)
 } finally { $assembly.Dispose() }
+. (Join-Path $PSScriptRoot 'version-installer.ps1')
+Set-InstallerFileVersion -Installer $installer -Application (Join-Path $payload 'AirStereo.exe') -Version $BuildId
 $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash
 ($hash + '  AirStereo-Setup.exe') | Set-Content -LiteralPath (Join-Path $output 'AirStereo-Setup.exe.sha256') -Encoding ASCII
 $metadata = [ordered]@{

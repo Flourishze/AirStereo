@@ -14,3 +14,7 @@ Diagnostics/
 *.pfx
 *.key
 *.user
+
+*.cer
+*.pem
+store-identity.json

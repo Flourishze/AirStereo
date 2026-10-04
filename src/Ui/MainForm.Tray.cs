@@ -14,7 +14,14 @@ namespace AirStereo.Ui
         private System.Windows.Forms.Timer dismissTimer;
         internal bool StartInTray { get; set; }
 
-        private int UiPixels(int value) => Math.Max(1, (int)Math.Round(value * DeviceDpi / 96.0));
+        // DeviceDpi can briefly report an invalid pre-handle value while a tray popup is
+        // being created or moved between monitors. Treat anything below the Windows
+        // baseline as 96 DPI so the popup cannot collapse during its first layout pass.
+        private int UiPixels(int value)
+        {
+            int dpi = Math.Max(96, DeviceDpi);
+            return Math.Max(1, (int)Math.Round(value * dpi / 96.0));
+        }
 
         private void BuildCompactLayout()
         {
@@ -524,7 +531,9 @@ namespace AirStereo.Ui
             Rectangle work = Screen.FromPoint(Cursor.Position).WorkingArea;
             int rows = Math.Max(1, Math.Min(4, deviceRows.Count));
             int height = UiPixels(254) + rows * Math.Max(UiPixels(88), Font.Height * 4 + UiPixels(12));
-            ClientSize = new Size(UiPixels(410), Math.Min(height, Math.Max(UiPixels(340), work.Height - UiPixels(16))));
+            int width = Math.Max(UiPixels(410), MinimumSize.Width);
+            int availableHeight = Math.Max(UiPixels(340), work.Height - UiPixels(16));
+            ClientSize = new Size(width, Math.Min(height, availableHeight));
             if (Visible) PositionPopup();
         }
 
@@ -575,16 +584,33 @@ namespace AirStereo.Ui
         protected override void OnVisibleChanged(EventArgs args)
         {
             base.OnVisibleChanged(args);
+            if (!OfflinePreview) FaultStore.Default.Activity("窗口生命周期：Visible=" + Visible + "，句柄=" + IsHandleCreated + "，尺寸=" + Width + "x" + Height);
             if (Visible) PositionPopup();
         }
 
         protected override void OnShown(EventArgs args)
         {
             base.OnShown(args);
+            if (!OfflinePreview) FaultStore.Default.Activity("窗口生命周期：OnShown，StartInTray=" + StartInTray + "，尺寸=" + Width + "x" + Height);
+            EnsurePopupSize();
+            if (trayIcon != null)
+            {
+                // Explorer may miss the first Shell_NotifyIcon call during login or
+                // after Explorer restarts. Re-registering the already-configured icon
+                // is safe and makes the tray entry deterministic.
+                trayIcon.Visible = false;
+                trayIcon.Visible = true;
+            }
             if (StartInTray)
             {
                 StartInTray = false;
                 Post(delegate { HideToTray(); if (!OfflinePreview) Opacity = 1; });
+            }
+            else
+            {
+                Opacity = 1;
+                PositionPopup();
+                BringToFront();
             }
         }
 

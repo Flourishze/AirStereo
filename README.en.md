@@ -6,7 +6,7 @@
 	<img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200"/>
 </a>
 
-Windows x64 AirPlay audio sender. The current version is **1.0.3**. The official source, release, and update-check source is [Flourishze/AirStereo](https://github.com/Flourishze/AirStereo)、Microsoft Store
+Windows x64 AirPlay audio sender. The current version is **1.0.4**. Source and standalone releases are published at [Flourishze/AirStereo](https://github.com/Flourishze/AirStereo). The Store edition is updated by Microsoft Store.
 
 ## What Is AirStereo?
 
@@ -44,7 +44,10 @@ Offline preview of the actual interface: speaker names and addresses are demonst
 
 ## Installation and Usage
 
-Download `AirStereo-Setup-1.0.3-x64.exe` from the repository's Releases page. Exit an older version from the tray menu before installing. The installer includes the .NET Core and Windows Desktop 10.0.12 runtimes and prefers the runtimes in the installation directory. No separate .NET runtime installation is required; the operating system must still be a Windows x64 version supported by .NET 10.
+Use EXE for the installation wizard or MSI for deployment. Install the Store-signed edition from Microsoft Store; the unsigned MSIX asset is for Store submission. Do not run both editions simultaneously.
+
+
+Download `AirStereo-Setup-1.0.4-x64.exe` from the repository's Releases page. Exit an older version from the tray menu before installing. The installer includes the .NET Core and Windows Desktop 10.0.12 runtimes and prefers the runtimes in the installation directory. No separate .NET runtime installation is required; the operating system must still be a Windows x64 version supported by .NET 10.
 
 1. Click the AirStereo tray icon in the lower-right corner, scan for speakers, and select the targets you want to use.
 2. Playback is disabled when nothing is selected. Selecting one independent speaker sends full stereo audio and disables the left/right balance control.
@@ -55,6 +58,12 @@ Download `AirStereo-Setup-1.0.3-x64.exe` from the repository's Releases page. Ex
 Actual compatibility depends on receiver firmware, access permissions, network conditions, and the service information exposed by the receiver. Not every device advertised as AirPlay-compatible is guaranteed to connect.
 
 Wireless playback includes capture, network, and receiver-buffer delays. The configured latency is not a measurement of end-to-end latency. AirStereo does not promise zero latency and is not a replacement for low-latency gaming audio or real-time monitoring equipment.
+
+## What's New in 1.0.4
+
+- Bounded capture/resampling buffers and discarded-log undo cleanup improve memory stability during extended use.
+- Restored click-outside dismissal of the tray panel on first launch.
+- Existing routing, EQ, channel tests and high-DPI layouts are retained.
 
 ## Settings
 
@@ -73,7 +82,7 @@ For a bug report, include the AirStereo version, Windows version, display scalin
 
 ## Build and Documentation
 
-See the [build guide](docs/BUILD.md), [acceptance checklist](docs/TESTING.md), [changelog](CHANGELOG.md), and [1.0.3 release notes](docs/releases/v1.0.3.md). The repository includes the application source and packaging scripts. The original source for the existing installer wizard is not included, so packaging still depends on the explicitly documented binary template.
+See the [build guide](docs/BUILD.md), [acceptance checklist](docs/TESTING.md), [changelog](CHANGELOG.md), and [1.0.4 release notes](docs/releases/v1.0.4.md). The repository includes the application source and packaging scripts. The original source for the existing installer wizard is not included, so packaging still depends on the explicitly documented binary template.
 
 ## License
 
