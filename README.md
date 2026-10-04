@@ -6,7 +6,7 @@
 	<img src="https://get.microsoft.com/images/zh-cn%20dark.svg" width="200"/>
 </a>
 
-Windows x64 AirPlay 音频发送应用。当前版本 **1.0.3**，唯一发布与更新来源为 [Flourishze/AirStereo](https://github.com/Flourishze/AirStereo)、Microsoft Stroe
+Windows x64 AirPlay 音频发送应用。当前版本 **1.0.3**，唯一发布与更新来源为 [Flourishze/AirStereo](https://github.com/Flourishze/AirStereo)、Microsoft Store
 
 ## 软件用途
 
