@@ -1,7 +1,9 @@
 # AirStereo
 
 [English](README.en.md)
-
+<a href="https://get.microsoft.com/installer/download/9nmx9h3gbgj4?referrer=appbadge" target="_self" >
+	<img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200"/>
+</a>
 Windows x64 AirPlay 音频发送应用。当前版本 **1.0.3**，唯一发布与更新来源为 [Flourishze/AirStereo](https://github.com/Flourishze/AirStereo)。
 
 ## 软件用途
