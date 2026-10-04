@@ -2,15 +2,9 @@
 
 [English](README.en.md)
 
-<script type="module" src="https://get.microsoft.com/badge/ms-store-badge.bundled.js"></script>
-<ms-store-badge
-	productid="9nmx9h3gbgj4"
-	window-mode="full"
-	theme="auto"
-	size="large"
-	language="zh-cn"
-	animation="on">
-</ms-store-badge>
+<a href="https://apps.microsoft.com/detail/9nmx9h3gbgj4?referrer=appbadge&mode=full" target="_blank"  rel="noopener noreferrer">
+	<img src="https://get.microsoft.com/images/zh-cn%20dark.svg" width="200"/>
+</a>
 
 Windows x64 AirPlay 音频发送应用。当前版本 **1.0.3**，唯一发布与更新来源为 [Flourishze/AirStereo](https://github.com/Flourishze/AirStereo)。
 
