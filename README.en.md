@@ -2,6 +2,10 @@
 
 [中文](README.md)
 
+<a href="https://apps.microsoft.com/detail/9nmx9h3gbgj4?referrer=appbadge&mode=full" target="_blank"  rel="noopener noreferrer">
+	<img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200"/>
+</a>
+
 Windows x64 AirPlay audio sender. The current version is **1.0.3**. The official source, release, and update-check source is [Flourishze/AirStereo](https://github.com/Flourishze/AirStereo).
 
 ## What Is AirStereo?
