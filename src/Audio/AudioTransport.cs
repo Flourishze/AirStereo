@@ -21,11 +21,25 @@ namespace AirStereo.Audio
         public const int Channels = 2;
         public const int PcmBytes = FramesPerPacket * Channels * 2;
         public const int MaxHistory = 512;
+        public const int MaxPacketBytes = 12 + NativeAlacEncoder.MaxEncodedBytes + 16 + 8;
+
+        public readonly struct PacketBuffer
+        {
+            public readonly byte[] Buffer;
+            public readonly int Length;
+
+            public PacketBuffer(byte[] buffer, int length)
+            {
+                Buffer = buffer;
+                Length = length;
+            }
+        }
 
         private sealed class CachedPacket
         {
             public ushort Sequence;
-            public byte[] Bytes = Array.Empty<byte>();
+            public byte[] Bytes;
+            public int Length;
             public DateTime SentAt;
             public DateTime Deadline;
         }
@@ -34,6 +48,8 @@ namespace AirStereo.Audio
         public const int SupportedRate48000 = 48000;
 
         private readonly ChaCha20Poly1305Compat aead;
+        private readonly bool useAlac;
+        private readonly NativeAlacEncoder alac;
         private readonly LinkedList<CachedPacket> history = new LinkedList<CachedPacket>();
         /// <summary>
         /// Sealed packets and their history records are recycled instead of collected: this runs
@@ -56,9 +72,12 @@ namespace AirStereo.Audio
         public uint Timestamp { get; private set; }
         public uint Ssrc { get; }
         public int Rate { get; }
+        public bool UseAlac { get { return useAlac; } }
+        public byte[] MagicCookie { get { return alac == null ? null : alac.MagicCookie; } }
         public long PacketsSent { get; private set; }
 
-        public AudioPacketizer(byte[] key, ushort sequence, uint timestamp, uint ssrc, int rate)
+        public AudioPacketizer(byte[] key, ushort sequence, uint timestamp, uint ssrc, int rate,
+            bool useAlac = true)
         {
             if (key == null || key.Length != 32) throw new ArgumentException("audio key must be 32 bytes");
             if (rate != SupportedRate44100 && rate != SupportedRate48000)
@@ -66,6 +85,8 @@ namespace AirStereo.Audio
                 throw new ArgumentException("sample rate must be 44100 or 48000");
             }
             aead = new ChaCha20Poly1305Compat(key);
+            this.useAlac = useAlac;
+            if (useAlac) alac = new NativeAlacEncoder(rate);
             Sequence = sequence;
             Timestamp = timestamp;
             Ssrc = ssrc;
@@ -84,19 +105,35 @@ namespace AirStereo.Audio
             return (uint)((long)latencyMs * rate / 1000);
         }
 
-        public byte[] Packet(byte[] pcm, bool first)
+        public PacketBuffer Packet(byte[] pcm, bool first)
         {
-            if (pcm.Length != PcmBytes) throw new ArgumentException("PCM block must be " + PcmBytes + " bytes");
+            if (pcm == null || pcm.Length != PcmBytes)
+                throw new ArgumentException("PCM block must be " + PcmBytes + " bytes", nameof(pcm));
             DateTime now = DateTime.UtcNow;
             return Packet(pcm, first, now, now + playWindow);
         }
 
-        public byte[] Packet(byte[] pcm, bool first, DateTime now, DateTime deadline)
+        public PacketBuffer Packet(byte[] pcm, bool first, DateTime now, DateTime deadline)
         {
-            if (pcm.Length != PcmBytes) throw new ArgumentException("PCM block must be " + PcmBytes + " bytes");
+            if (pcm == null || pcm.Length != PcmBytes)
+                throw new ArgumentException("PCM block must be " + PcmBytes + " bytes", nameof(pcm));
 
-            int length = 12 + pcm.Length + 16 + 8;
-            byte[] packet = sparePackets.Count > 0 ? sparePackets.Pop() : new byte[length];
+            ReadOnlySpan<byte> payload;
+            int payloadLength;
+            if (useAlac)
+            {
+                payloadLength = alac.Encode(pcm);
+                payload = alac.OutputBuffer.AsSpan(0, payloadLength);
+            }
+            else
+            {
+                payloadLength = pcm.Length;
+                payload = pcm.AsSpan();
+            }
+
+            int length = 12 + payloadLength + 16 + 8;
+            if (length > MaxPacketBytes) throw new InvalidOperationException("encoded packet exceeds pool capacity");
+            byte[] packet = sparePackets.Count > 0 ? sparePackets.Pop() : new byte[MaxPacketBytes];
             packet[0] = 0x80;
             packet[1] = first ? (byte)0xE0 : (byte)0x60;
             BinaryPrimitives.WriteUInt16BigEndian(packet.AsSpan(2), Sequence);
@@ -107,21 +144,22 @@ namespace AirStereo.Audio
             Span<byte> nonce = stackalloc byte[12];
             nonce.Clear();
             BinaryPrimitives.WriteUInt64LittleEndian(nonce.Slice(4), nonceCounter);
-            aead.Encrypt(nonce, pcm, packet.AsSpan(12, pcm.Length),
-                packet.AsSpan(12 + pcm.Length, 16), packet.AsSpan(4, 8));
-            BinaryPrimitives.WriteUInt64LittleEndian(packet.AsSpan(12 + pcm.Length + 16), nonceCounter);
+            aead.Encrypt(nonce, payload, packet.AsSpan(12, payloadLength),
+                packet.AsSpan(12 + payloadLength, 16), packet.AsSpan(4, 8));
+            BinaryPrimitives.WriteUInt64LittleEndian(packet.AsSpan(12 + payloadLength + 16), nonceCounter);
             counter++;
 
             CachedPacket record = spareRecords.Count > 0 ? spareRecords.Pop() : new CachedPacket();
             record.Sequence = Sequence;
             record.Bytes = packet;
+            record.Length = length;
             record.SentAt = now;
             record.Deadline = deadline;
             Retain(record);
             Sequence++;
             Timestamp += FramesPerPacket;
             PacketsSent++;
-            return packet;
+            return new PacketBuffer(packet, length);
         }
 
         private void Retain(CachedPacket packet)
@@ -138,12 +176,13 @@ namespace AirStereo.Audio
 
         private void Recycle(CachedPacket cached)
         {
-            if (cached.Bytes != null && cached.Bytes.Length == 12 + PcmBytes + 16 + 8 &&
+            if (cached.Bytes != null && cached.Bytes.Length >= MaxPacketBytes &&
                 sparePackets.Count < MaxHistory)
             {
                 sparePackets.Push(cached.Bytes);
             }
             cached.Bytes = null;
+            cached.Length = 0;
             if (spareRecords.Count < MaxHistory) spareRecords.Push(cached);
         }
 
@@ -177,11 +216,11 @@ namespace AirStereo.Audio
             CachedPacket cached = node.Value;
             if (now >= cached.Deadline || now - cached.SentAt >= retention) return RetransmitResult.Expired;
 
-            reply = new byte[4 + cached.Bytes.Length];
+            reply = new byte[4 + cached.Length];
             reply[0] = 0x80;
             reply[1] = 0xD6;
             BinaryPrimitives.WriteUInt16BigEndian(reply.AsSpan(2), sequence);
-            Buffer.BlockCopy(cached.Bytes, 0, reply, 4, cached.Bytes.Length);
+            Buffer.BlockCopy(cached.Bytes, 0, reply, 4, cached.Length);
             return RetransmitResult.Packet;
         }
 
@@ -245,6 +284,7 @@ namespace AirStereo.Audio
 
         public void Dispose()
         {
+            alac?.Dispose();
             aead.Dispose();
         }
     }

@@ -78,11 +78,15 @@ namespace AirStereo
 
             try
             {
+                SessionOptions media = ParseMediaArguments(args, out args);
+                if (args.Length == 0)
+                    throw new ProtocolException("media options need an explicit gui or play command");
                 switch (args[0].ToLowerInvariant())
                 {
                     case "gui":
                     case "window":
-                        return Ui.MainForm.Run(Array.Exists(args, value => value.Equals("--tray", StringComparison.OrdinalIgnoreCase)));
+                        return Ui.MainForm.Run(Array.Exists(args, value => value.Equals("--tray", StringComparison.OrdinalIgnoreCase)),
+                            media.SourceSilenceDisconnectMilliseconds, media.UseAlac, media.SilenceMode);
                     case "discover":
                         return Discover(Options(args, 1));
                     case "selftest":
@@ -90,7 +94,7 @@ namespace AirStereo
                     case "info":
                         return Info(Options(args, 1));
                     case "play":
-                        return Play(Options(args, 1));
+                        return Play(Options(args, 1), media);
                     case "volume":
                         return Volume(Options(args, 1));
                     case "devices":
@@ -155,6 +159,53 @@ namespace AirStereo
             Console.WriteLine("Options: --rate 44100|48000   --seconds N   --verbose");
             Console.WriteLine("         --pin CODE           --no-ptp       --group-id ID");
             Console.WriteLine("         --gain 0.0..4.0      --handshake-only");
+            Console.WriteLine("         --pcm               Experimental PCM fallback; not recommended for multi-device");
+            Console.WriteLine("GUI/play experiments: --pcm, --silence-mode=repeat-last|zero");
+            Console.WriteLine("      --silence-disconnect-ms=5400000 (90 minutes, source-confirmed silence only)");
+            Console.WriteLine("      ALAC continuous media; HomePod acceptance pending. H2 --standby-ms retired.");
+        }
+
+        /// <summary>Runtime-only experiment options for both GUI and CLI. Never persisted.</summary>
+        internal static SessionOptions ParseMediaArguments(string[] args, out string[] remaining)
+        {
+            SessionOptions media = new SessionOptions();
+            HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            List<string> kept = new List<string>();
+            for (int i = 0; i < args.Length; i++)
+            {
+                string argument = args[i];
+                int equals = argument.IndexOf('=');
+                string key = equals >= 0 ? argument.Substring(0, equals) : argument;
+                if (key.Equals("--standby-ms", StringComparison.OrdinalIgnoreCase))
+                    throw new ProtocolException("--standby-ms belongs to retired H2: continuous media no longer enters standby");
+                if (!key.Equals("--silence-disconnect-ms", StringComparison.OrdinalIgnoreCase) &&
+                    !key.Equals("--silence-mode", StringComparison.OrdinalIgnoreCase) &&
+                    !key.Equals("--pcm", StringComparison.OrdinalIgnoreCase))
+                {
+                    kept.Add(argument);
+                    continue;
+                }
+                if (!seen.Add(key)) throw new ProtocolException(key + " must be specified only once");
+                if (key.Equals("--pcm", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (equals >= 0) throw new ProtocolException("--pcm takes no value");
+                    media.UseAlac = false;
+                    continue;
+                }
+                if (equals < 0 && i + 1 >= args.Length) throw new ProtocolException(key + " needs a value");
+                string value = equals >= 0 ? argument.Substring(equals + 1) : args[++i];
+                if (key.Equals("--silence-disconnect-ms", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out int milliseconds) || milliseconds <= 0)
+                        throw new ProtocolException(key + " must be a positive integer of milliseconds");
+                    media.SourceSilenceDisconnectMilliseconds = milliseconds;
+                }
+                else if (value.Equals("repeat-last", StringComparison.OrdinalIgnoreCase)) media.SilenceMode = SilenceFrameMode.RepeatLast;
+                else if (value.Equals("zero", StringComparison.OrdinalIgnoreCase)) media.SilenceMode = SilenceFrameMode.Zero;
+                else throw new ProtocolException("--silence-mode must be repeat-last or zero");
+            }
+            remaining = kept.ToArray();
+            return media;
         }
 
         private static Dictionary<string, string> Options(string[] args, int start)
@@ -169,7 +220,8 @@ namespace AirStereo
                 }
                 string key = argument.Substring(2);
                 bool takesValue = key != "verbose" && key != "json" && key != "tone" &&
-                    key != "pattern" && key != "no-ptp" && key != "handshake-only";
+                    key != "pattern" && key != "no-ptp" && key != "handshake-only" &&
+                    key != "pcm";
                 if (takesValue)
                 {
                     if (i + 1 >= args.Length) throw new ProtocolException("--" + key + " needs a value");
@@ -379,12 +431,15 @@ namespace AirStereo
             return 0;
         }
 
-        private static int Play(Dictionary<string, string> options)
+        private static int Play(Dictionary<string, string> options, SessionOptions media)
         {
             List<ReceiverGroup> groups = Resolve(options, out string selector);
             ReceiverGroup group = groups[0];
 
             PlayRequest request = new PlayRequest();
+            request.SourceSilenceDisconnectMilliseconds = media.SourceSilenceDisconnectMilliseconds;
+            request.SilenceMode = media.SilenceMode;
+            request.UseAlac = media.UseAlac;
             request.WavPath = Value(options, "wav", null);
             if (!string.IsNullOrEmpty(request.WavPath)) request.Kind = "wav";
             else if (Flag(options, "tone")) request.Kind = "tone";

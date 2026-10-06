@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
 
@@ -210,12 +211,15 @@ namespace AirStereo.Audio
     public sealed class LoopbackSource : AudioSource, IDisposable
     {
         private readonly string deviceName;
-        private readonly int captureRate;
-        private readonly int captureChannels;
-        private readonly bool captureIsFloat;
-        private readonly int captureBytesPerSample;
-        private readonly SincResampler resampler;
+        private int captureRate;
+        private int captureChannels;
+        private bool captureIsFloat;
+        private int captureBytesPerSample;
+        private SincResampler resampler;
         private readonly Queue<short> output = new Queue<short>();
+        private readonly Queue<AudioReadActivity> activities = new Queue<AudioReadActivity>();
+        private AudioReadActivity lastReadActivity = AudioReadActivity.Unknown;
+        public override AudioReadActivity LastReadActivity { get { return lastReadActivity; } }
         /// <summary>Capture timestamp of every frame in <see cref="output"/>, oldest first.</summary>
         private readonly Queue<long> stamps = new Queue<long>();
         /// <summary>Age of the freshest frame of the last few thousand blocks, in milliseconds.</summary>
@@ -234,7 +238,9 @@ namespace AirStereo.Audio
         /// <summary>Signalled by the capture pump as soon as it has queued audio.</summary>
         private AutoResetEvent dataReady;
         private Thread worker;
+        private readonly object captureLifecycleLock = new object();
         private volatile bool stopping;
+        private bool disposed;
         private long capturedFrames;
         private long silentPackets;
         /// <summary>Reads that found the queue empty: the sender was about to run dry.</summary>
@@ -399,69 +405,172 @@ namespace AirStereo.Audio
             if (hr < 0) throw new InvalidOperationException("no default playback device is available");
             deviceObject = device;
             deviceName = AudioInterop.DeviceName(device) ?? "default playback device";
-
-            Guid clientId = typeof(AudioInterop.IAudioClient).GUID;
-            object instance;
-            hr = device.Activate(ref clientId, AudioInterop.CLSCTX_ALL, IntPtr.Zero, out instance);
-            if (hr < 0) throw new InvalidOperationException("the audio engine refused an audio client");
-            clientObject = instance;
-            client = (AudioInterop.IAudioClient)instance;
-
-            IntPtr formatPointer;
-            hr = client.GetMixFormat(out formatPointer);
-            if (hr < 0 || formatPointer == IntPtr.Zero)
-            {
-                throw new InvalidOperationException("the audio engine did not report a mix format");
-            }
-
-            try
-            {
-                ParseFormat(formatPointer, out captureRate, out captureChannels,
-                    out captureIsFloat, out captureBytesPerSample);
-
-                bufferEvent = new AutoResetEvent(false);
-                dataReady = new AutoResetEvent(false);
-                // The event callback flag is only accepted by Initialize, and the handle can
-                // only be handed over once initialization has succeeded.
-                hr = client.Initialize(AudioInterop.SHAREMODE_SHARED,
-                    AudioInterop.STREAMFLAGS_LOOPBACK | AudioInterop.STREAMFLAGS_EVENTCALLBACK,
-                    2000000, 0, formatPointer, IntPtr.Zero);
-                if (hr < 0)
-                {
-                    throw new InvalidOperationException(
-                        "loopback capture could not be started (0x" + hr.ToString("x8") + ")");
-                }
-
-                hr = client.SetEventHandle(bufferEvent.SafeWaitHandle.DangerousGetHandle());
-                if (hr < 0)
-                {
-                    throw new InvalidOperationException(
-                        "the audio engine rejected the buffer event (0x" + hr.ToString("x8") + ")");
-                }
-            }
-            finally
-            {
-                Marshal.FreeCoTaskMem(formatPointer);
-            }
-
-            resampler = new SincResampler(captureRate, sampleRate);
             targetFrames = (long)Math.Round(TargetQueueMilliseconds * sampleRate / 1000.0);
 
-            Guid captureId = typeof(AudioInterop.IAudioCaptureClient).GUID;
-            object captureInstance;
-            hr = client.GetService(ref captureId, out captureInstance);
-            if (hr < 0) throw new InvalidOperationException("the audio engine exposed no capture client");
-            captureObject = captureInstance;
-            capture = (AudioInterop.IAudioCaptureClient)captureInstance;
-
-            hr = client.Start();
-            if (hr < 0) throw new InvalidOperationException("the audio engine refused to start capture");
-
-            worker = new Thread(Pump) { IsBackground = true, Name = "AirStereo loopback" };
-            worker.Start();
+            StartCapture();
         }
 
+        /// <summary>
+        /// Creates a fresh WASAPI loopback client and capture worker. Recreating this pipeline is
+        /// intentional: after a long silent period Windows may keep the old RTSP/media session
+        /// alive while the old loopback capture path no longer produces usable PCM.
+        /// </summary>
+        private void StartCapture()
+        {
+            object newClientObject = null;
+            object newCaptureObject = null;
+            AutoResetEvent newBufferEvent = null;
+            AutoResetEvent newDataReady = null;
+            AudioInterop.IAudioClient newClient = null;
+            try
+            {
+                AudioInterop.IMMDevice device = (AudioInterop.IMMDevice)deviceObject;
+                Guid clientId = typeof(AudioInterop.IAudioClient).GUID;
+                object instance;
+                int hr = device.Activate(ref clientId, AudioInterop.CLSCTX_ALL, IntPtr.Zero, out instance);
+                if (hr < 0) throw new InvalidOperationException("the audio engine refused an audio client");
+                newClientObject = instance;
+                newClient = (AudioInterop.IAudioClient)instance;
+
+                IntPtr formatPointer;
+                hr = newClient.GetMixFormat(out formatPointer);
+                if (hr < 0 || formatPointer == IntPtr.Zero)
+                    throw new InvalidOperationException("the audio engine did not report a mix format");
+                try
+                {
+                    ParseFormat(formatPointer, out captureRate, out captureChannels,
+                        out captureIsFloat, out captureBytesPerSample);
+                    newBufferEvent = new AutoResetEvent(false);
+                    newDataReady = new AutoResetEvent(false);
+                    hr = newClient.Initialize(AudioInterop.SHAREMODE_SHARED,
+                        AudioInterop.STREAMFLAGS_LOOPBACK | AudioInterop.STREAMFLAGS_EVENTCALLBACK,
+                        2000000, 0, formatPointer, IntPtr.Zero);
+                    if (hr < 0)
+                        throw new InvalidOperationException(
+                            "loopback capture could not be started (0x" + hr.ToString("x8") + ")");
+                    hr = newClient.SetEventHandle(newBufferEvent.SafeWaitHandle.DangerousGetHandle());
+                    if (hr < 0)
+                        throw new InvalidOperationException(
+                            "the audio engine rejected the buffer event (0x" + hr.ToString("x8") + ")");
+                }
+                finally
+                {
+                    Marshal.FreeCoTaskMem(formatPointer);
+                }
+
+                SincResampler newResampler = new SincResampler(captureRate, SampleRate);
+                Guid captureId = typeof(AudioInterop.IAudioCaptureClient).GUID;
+                object captureInstance;
+                hr = newClient.GetService(ref captureId, out captureInstance);
+                if (hr < 0) throw new InvalidOperationException("the audio engine exposed no capture client");
+                newCaptureObject = captureInstance;
+                AudioInterop.IAudioCaptureClient newCapture =
+                    (AudioInterop.IAudioCaptureClient)captureInstance;
+
+                hr = newClient.Start();
+                if (hr < 0) throw new InvalidOperationException("the audio engine refused to start capture");
+
+                captureObject = newCaptureObject;
+                newCaptureObject = null;
+                capture = newCapture;
+                clientObject = newClientObject;
+                newClientObject = null;
+                client = newClient;
+                resampler = newResampler;
+                lastError = null;
+                bufferEvent = newBufferEvent;
+                newBufferEvent = null;
+                dataReady = newDataReady;
+                newDataReady = null;
+                stopping = false;
+                worker = new Thread(Pump) { IsBackground = true, Name = "AirStereo loopback" };
+                worker.Start();
+            }
+            catch
+            {
+                try { newClient?.Stop(); } catch (Exception) { }
+                newBufferEvent?.Dispose();
+                newDataReady?.Dispose();
+                AudioInterop.Release(newCaptureObject);
+                AudioInterop.Release(newClientObject);
+                throw;
+            }
+        }
+
+        private void ClearCaptureBuffers()
+        {
+            lock (output)
+            {
+                output.Clear();
+                activities.Clear();
+                lastReadActivity = AudioReadActivity.Unknown;
+                stamps.Clear();
+                ages.Clear();
+            }
+            staging = new float[0];
+            lastDevicePosition = -1;
+            maxAgeMilliseconds = 0.0;
+            queueCeiling = 0;
+            trimPpm = 0.0;
+        }
+
+        /// <summary>
+        /// Mirrors the stable resume path used by mature loopback senders: stop the old capture
+        /// worker, discard stale PCM and converter state, then create a new WASAPI client.
+        /// </summary>
+        public override void PrepareForResume()
+        {
+            lock (captureLifecycleLock)
+            {
+                if (disposed) throw new ObjectDisposedException(nameof(LoopbackSource));
+                if (!StopCapturePipeline())
+                    throw new InvalidOperationException("the WASAPI capture worker did not stop");
+                ClearCaptureBuffers();
+                lastError = null;
+                try
+                {
+                    StartCapture();
+                }
+                catch (Exception error)
+                {
+                    lastError = error.GetType().Name + ": " + error.Message;
+                    throw;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Stops the capture thread before releasing its COM interfaces. This ordering is
+        /// important: releasing IAudioCaptureClient while Pump is inside GetBuffer/ReleaseBuffer
+        /// can leave the next resume with a dead capture path or audible garbage.
+        /// </summary>
+        private bool StopCapturePipeline()
+        {
+            stopping = true;
+            try { client?.Stop(); } catch (Exception) { }
+            try { bufferEvent?.Set(); } catch (ObjectDisposedException) { }
+            try { dataReady?.Set(); } catch (ObjectDisposedException) { }
+
+            Thread oldWorker = worker;
+            if (oldWorker != null && oldWorker != Thread.CurrentThread && oldWorker.IsAlive)
+                oldWorker.Join(2000);
+            if (oldWorker != null && oldWorker.IsAlive) return false;
+
+            worker = null;
+            AudioInterop.Release(captureObject);
+            captureObject = null;
+            capture = null;
+            AudioInterop.Release(clientObject);
+            clientObject = null;
+            client = null;
+            bufferEvent?.Dispose();
+            bufferEvent = null;
+            dataReady?.Dispose();
+            dataReady = null;
+            return true;
+        }
         public override int SampleRate { get; }
+        public override bool IsRealtime { get { return true; } }
 
         public string DeviceName { get { return deviceName; } }
         public int CaptureRate { get { return captureRate; } }
@@ -532,6 +641,7 @@ namespace AirStereo.Audio
                 {
                     output.Dequeue();
                     output.Dequeue();
+                    activities.Dequeue();
                     stamps.Dequeue();
                 }
             }
@@ -552,16 +662,27 @@ namespace AirStereo.Audio
         {
             int needed = frames * 2;
             int written = 0;
+            bool anyActive = false;
+            bool anyUnknown = false;
             bool starved = false;
             long waitingSince = 0;
             long newestStamp = 0;
-            while (written < needed && !stopping)
+            // A media slot is about 7.98 ms at 44.1 kHz (352 frames). Waiting
+            // longer than one slot makes an idle render endpoint manufacture sender
+            // lateness and causes the pacing loop to skip media slots. Return a
+            // zero-filled Starved block promptly instead.
+            long slotTicks = Math.Max(1L, (long)Math.Ceiling(frames * (double)Stopwatch.Frequency / SampleRate));
+            long readDeadline = Stopwatch.GetTimestamp() + slotTicks;
+            while (written < needed && !stopping && Stopwatch.GetTimestamp() < readDeadline)
             {
                 lock (output)
                 {
                     while (written < needed && output.Count > 0)
                     {
                         newestStamp = stamps.Dequeue();
+                        AudioReadActivity activity = activities.Dequeue();
+                        anyActive |= activity == AudioReadActivity.Active;
+                        anyUnknown |= activity != AudioReadActivity.Active && activity != AudioReadActivity.ConfirmedSilent;
                         buffer[written++] = output.Dequeue();
                         buffer[written++] = output.Dequeue();
                     }
@@ -584,7 +705,7 @@ namespace AirStereo.Audio
                     // Waking on the pump's signal beats polling Thread.Sleep(1): the sleep is
                     // bound to the 15.6 ms system tick, and at a small buffer that delay is the
                     // whole margin.
-                    dataReady.WaitOne(2);
+                    dataReady.WaitOne(1);
                 }
             }
             if (starved)
@@ -599,7 +720,16 @@ namespace AirStereo.Audio
                 }
             }
             for (int i = written; i < needed; i++) buffer[i] = 0;
+            // Waiting for a complete capture block is normal; only synthetic padding is starved.
+            lastReadActivity = AggregateReadActivity(written, needed, anyActive, anyUnknown);
             return frames;
+        }
+
+        internal static AudioReadActivity AggregateReadActivity(int written, int needed, bool anyActive, bool anyUnknown)
+        {
+            if (written < needed) return AudioReadActivity.Starved;
+            if (anyActive) return AudioReadActivity.Active;
+            return anyUnknown ? AudioReadActivity.Unknown : AudioReadActivity.ConfirmedSilent;
         }
 
         private void Pump()
@@ -708,8 +838,15 @@ namespace AirStereo.Audio
                 for (int i = 0; i < producedFrames; i++)
                 {
                     stamps.Enqueue(stamp - (producedFrames - 1 - i) * frameTicks);
-                    output.Enqueue(ToSample(produced[i * 2]));
-                    output.Enqueue(ToSample(produced[i * 2 + 1]));
+                    short left = ToSample(produced[i * 2]);
+                    short right = ToSample(produced[i * 2 + 1]);
+                    output.Enqueue(left);
+                    output.Enqueue(right);
+                    // BUFFERFLAGS_SILENT is passed as a null capture pointer above. Do not
+                    // label resampler tails or quiet nonzero music as confirmed silence.
+                    // Some endpoints omit SILENT, so fully captured digital zeros also count.
+                    activities.Enqueue(left == 0 && right == 0
+                        ? AudioReadActivity.ConfirmedSilent : AudioReadActivity.Active);
                 }
                 TrimQueueToLimit();
                 depth = output.Count;
@@ -735,6 +872,7 @@ namespace AirStereo.Audio
             {
                 if (output.Count >= 2) { output.Dequeue(); output.Dequeue(); }
                 if (stamps.Count > 0) stamps.Dequeue();
+                if (activities.Count > 0) activities.Dequeue();
             }
         }
 
@@ -828,29 +966,28 @@ namespace AirStereo.Audio
 
         public override void Stop()
         {
-            stopping = true;
-            try
+            lock (captureLifecycleLock)
             {
-                if (client != null) client.Stop();
+                stopping = true;
+                try { client?.Stop(); } catch (Exception) { }
+                try { bufferEvent?.Set(); } catch (ObjectDisposedException) { }
+                try { dataReady?.Set(); } catch (ObjectDisposedException) { }
             }
-            catch (Exception)
-            {
-                // the endpoint may already have gone away
-            }
-            try { bufferEvent?.Set(); } catch (ObjectDisposedException) { }
-            try { dataReady?.Set(); } catch (ObjectDisposedException) { }
         }
 
         public void Dispose()
         {
-            Stop();
-            if (worker != null && worker.IsAlive) worker.Join(500);
-            bufferEvent?.Dispose();
-            dataReady?.Dispose();
-            AudioInterop.Release(captureObject);
-            AudioInterop.Release(clientObject);
-            AudioInterop.Release(deviceObject);
-            AudioInterop.Release(enumeratorObject);
+            lock (captureLifecycleLock)
+            {
+                if (disposed) return;
+                disposed = true;
+                StopCapturePipeline();
+                AudioInterop.Release(deviceObject);
+                deviceObject = null;
+                AudioInterop.Release(enumeratorObject);
+                enumeratorObject = null;
+            }
         }
     }
 }
+

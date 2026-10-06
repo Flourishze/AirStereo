@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$BuildDirectory,
     [Parameter(Mandatory = $true)][string]$OutputDirectory,
@@ -28,7 +28,7 @@ New-Item -ItemType Directory -Force -Path $output | Out-Null
 $payload = Join-Path $output 'payload'
 if (Test-Path -LiteralPath $payload) { throw 'Payload directory already exists. Choose a new output directory.' }
 New-Item -ItemType Directory -Path $payload | Out-Null
-$programFiles = @('AirStereo.dll', 'AirStereo.exe', 'AirStereo.runtimeconfig.json', 'AirStereo.cmd')
+$programFiles = @('AirStereo.dll', 'AirStereo.exe', 'AirStereo.runtimeconfig.json', 'AirStereo.cmd', 'LibALAC64.dll', 'LibALAC-LICENSE.txt')
 foreach ($name in $programFiles) {
     $file = Join-Path $build $name
     if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Missing build file: $name" }
@@ -97,7 +97,7 @@ try {
         "保留单设备完整立体声、自选双设备 L/R 与原生配对音频链路，以及 EQ、平衡和测试音。"
         ""
         "安装前请从右下角托盘菜单退出旧版。可选择原目录进行覆盖安装。"
-        "本版改进：采集与重采样缓冲上限、滚动日志撤销历史清理、首次打开托盘窗口后点击桌面自动收回。"
+        "本版改进：默认 ALAC 编码与可观测诊断、静音保流、采集饥饿保护、串流时静音本机输出、启动自动连接和诊断日志自动跟随。"
         "故障记录保存在软件目录 Diagnostics；目录不可写时回退到当前用户的本地应用数据目录。"
         "可在设置的故障记录页查看，并直接打开实际存储目录。"
         ""
@@ -170,5 +170,7 @@ $metadata | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'Packag
 Write-Output "installer=$installer"
 Write-Output "sha256=$hash"
 Write-Output "bytes=$($metadata.Bytes) payloadEntries=$($metadata.PayloadEntries)"
+
+
 
 

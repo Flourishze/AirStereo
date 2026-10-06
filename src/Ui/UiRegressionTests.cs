@@ -57,7 +57,7 @@ namespace AirStereo.Ui
             Exception failure = null;
             Thread thread = new Thread(() =>
             {
-                try { Verify(check); }
+                try { FeatureRegressionTests.VerifyUi(check); Verify(check); }
                 catch (Exception error) { failure = error; }
             });
             thread.SetApartmentState(ApartmentState.STA);
@@ -101,6 +101,29 @@ namespace AirStereo.Ui
                     timer.Stop();
                     popup.OfflinePreview = true;
                 }
+                Set(popup, "playing", true);
+                MethodInfo codecUpdate = typeof(MainForm).GetMethod("UpdateCodecFromDiagnostics", Private);
+                MethodInfo statusUpdate = typeof(MainForm).GetMethod("SetStatus", Private);
+                statusUpdate.Invoke(popup, new object[] { "连接中…" });
+                codecUpdate.Invoke(popup, new object[] { Session.ReceiverSession.CodecDiagnostics(true, true, 44100, 24) });
+                statusUpdate.Invoke(popup, new object[] { "播放中" });
+                check("UI connected tray status and tooltip show actual ALAC",
+                    ((Label)Field(popup, "popupStatus")).Text == "播放中 · ALAC" &&
+                    ((NotifyIcon)Field(popup, "trayIcon")).Text.Contains("当前编码 ALAC"), null);
+                codecUpdate.Invoke(popup, new object[] { Session.ReceiverSession.CodecDiagnostics(false, false, 44100, 0) });
+                check("UI tray reflects experimental PCM instead of requested default",
+                    ((Label)Field(popup, "popupStatus")).Text == "播放中 · PCM" &&
+                    ((NotifyIcon)Field(popup, "trayIcon")).Text.Contains("当前编码 PCM"), null);
+                Set(popup, "playing", false);
+                statusUpdate.Invoke(popup, new object[] { "已停止" });
+                codecUpdate.Invoke(popup, new object[] { Session.ReceiverSession.CodecDiagnostics(true, true, 44100, 24) });
+                check("UI stopped tray clears previous codec and ignores late diagnostics",
+                    ((Label)Field(popup, "popupStatus")).Text == "已停止" &&
+                    !((NotifyIcon)Field(popup, "trayIcon")).Text.Contains("当前编码"), null);
+                Set(popup, "playing", true);
+                statusUpdate.Invoke(popup, new object[] { "连接失败 · synthetic" });
+                check("UI failed connection does not retain stale codec", Field(popup, "currentCodec") == null, null);
+                Set(popup, "playing", false);
                 Call(popup, "HideToTray");
                 check("UI hiding cancels pending dismissal and retains the tray icon",
                     !timer.Enabled && ((NotifyIcon)Field(popup, "trayIcon")).Visible, null);

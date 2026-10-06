@@ -70,6 +70,8 @@ namespace AirStereo.Audio
             this.control = control;
         }
         public override int SampleRate { get { return source.SampleRate; } }
+        public override bool IsRealtime { get { return source.IsRealtime; } }
+        public override AudioReadActivity LastReadActivity { get { return source.LastReadActivity; } }
         public override int Read(short[] buffer, int frames)
         {
             int count = source.Read(buffer, frames);
@@ -77,8 +79,10 @@ namespace AirStereo.Audio
             return count;
         }
         public override void Prepare() { source.Prepare(); }
+        public override void PrepareForResume() { source.PrepareForResume(); }
         public override void Stop() { source.Stop(); }
         public override string Stats() { return source.Stats(); }
         public void Dispose() { (source as IDisposable)?.Dispose(); }
     }
 }
+

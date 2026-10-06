@@ -11,17 +11,20 @@
 这些值区分大小写，不能用 Win32 产品 GUID 或自行编写的发布者代替。
 不要删除现有 EXE/MSI 项目或擅自释放预留名称；名称复用/迁移须在合作伙伴中心确认。
 
+已确认的 AirStereo 商店发布者显示名称为 **Flourish**（不是 GitHub 用户名 Flourishze）。
+清单的 `PublisherDisplayName` 必须与合作伙伴中心登记值完全一致；不要把 GitHub 用户名当作商店发布者显示名称。
+
 模板：`installer/store-identity.example.json`。示例里的占位符不能用于正式打包。
 命令在项目根目录以 PowerShell 7 执行：
 
 ```powershell
-.\installer\package-msix.ps1 -IdentityFile .\store-identity.json -OutputDirectory packages\msix-store-1.0.4
+.\installer\package-msix.ps1 -IdentityFile .\store-identity.json -OutputDirectory packages\msix-store-1.0.5
 ```
 
 未取得商店身份时只能制作明确标为本地验证的包：
 
 ```powershell
-.\installer\package-msix.ps1 -LocalValidation -OutputDirectory packages\msix-local-1.0.4
+.\installer\package-msix.ps1 -LocalValidation -OutputDirectory packages\msix-local-1.0.5
 ```
 
 本地验证身份 **不是商店身份**，生成的包不可作为 AirStereo 的正式商店提交。
@@ -30,7 +33,7 @@
 
 ## 包内容与行为
 
-- x64，版本 `1.0.4.0`（末位为商店保留的 0）。
+- x64，版本 `1.0.5.0`（末位为商店保留的 0）。
 - 最低 Windows 10 22H2（19045），使用本机已安装的最新 Windows SDK 和匹配的
   .NET Core / Desktop 运行时；运行时随包分发，无需下载。
 - 无 EXE 安装向导、独立卸载器、注册表安装项、日志、配对信息或私钥。
@@ -75,3 +78,6 @@
 - https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/app-package-requirements
 - https://learn.microsoft.com/en-us/uwp/api/windows.applicationmodel.startuptask
 - https://learn.microsoft.com/en-us/windows/msix/desktop/desktop-to-uwp-behind-the-scenes
+
+
+

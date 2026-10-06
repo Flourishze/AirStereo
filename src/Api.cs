@@ -186,6 +186,11 @@ namespace AirStereo
         /// the streamer choose. Ten a second is the value every working sender uses.
         /// </summary>
         public int SyncIntervalMs = SessionOptions.DefaultSyncMs;
+        /// <summary>Runtime-only source-silence disconnect threshold; never connection age.</summary>
+        public int SourceSilenceDisconnectMilliseconds = SessionOptions.DefaultSourceSilenceDisconnectMilliseconds;
+        public SilenceFrameMode SilenceMode = SilenceFrameMode.RepeatLast;
+        /// <summary>Native ALAC is the default; false is an experimental PCM fallback.</summary>
+        public bool UseAlac = true;
         public double Gain = 1.0;
         /// <summary>Optional live EQ and per-channel calibration; null means untouched audio.</summary>
         public AudioProfileController Calibration;
@@ -466,6 +471,10 @@ namespace AirStereo
         {
             if (group == null) throw new ArgumentNullException("group");
             if (request == null) throw new ArgumentNullException("request");
+            if (request.SourceSilenceDisconnectMilliseconds <= 0)
+                throw new ProtocolException("source silence disconnect milliseconds must be positive");
+            if (request.SilenceMode != SilenceFrameMode.RepeatLast && request.SilenceMode != SilenceFrameMode.Zero)
+                throw new ProtocolException("invalid silence frame mode");
             if (stop == null) stop = new ManualResetEventSlim(false);
             Action<string> say = log ?? delegate { };
 
@@ -498,6 +507,9 @@ namespace AirStereo
                 SampleRate = rate,
                 LatencyMs = request.LatencyMs,
                 SyncMs = request.SyncIntervalMs,
+                SourceSilenceDisconnectMilliseconds = request.SourceSilenceDisconnectMilliseconds,
+                SilenceMode = request.SilenceMode,
+                UseAlac = request.UseAlac,
                 UsePtp = request.UsePtp,
                 Pin = string.IsNullOrEmpty(request.Pin) ? Srp.DefaultPin : request.Pin,
                 GroupId = group.GroupId,

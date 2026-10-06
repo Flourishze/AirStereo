@@ -2,8 +2,8 @@
 param(
     [Parameter(Mandatory, ParameterSetName = 'Store')][string]$IdentityFile,
     [Parameter(Mandatory, ParameterSetName = 'Local')][switch]$LocalValidation,
-    [string]$OutputDirectory = 'packages\msix-1.0.4',
-    [string]$Version = '1.0.4',
+    [string]$OutputDirectory = 'packages\msix-1.0.5',
+    [string]$Version = '1.0.5',
     [string]$MinimumWindowsVersion = '10.0.19045.0'
 )
 $ErrorActionPreference = 'Stop'
@@ -61,7 +61,7 @@ New-Item -ItemType Directory -Force -Path $app | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'Application build failed.' }
 $fileVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $build 'AirStereo.dll'))
 if ($fileVersion.ProductVersion -ne $Version) { throw 'App version does not match the requested package version.' }
-foreach ($name in @('AirStereo.exe', 'AirStereo.dll', 'AirStereo.runtimeconfig.json')) {
+foreach ($name in @('AirStereo.exe', 'AirStereo.dll', 'AirStereo.runtimeconfig.json', 'LibALAC64.dll', 'LibALAC-LICENSE.txt')) {
     if (-not (Test-Path -LiteralPath (Join-Path $build $name))) { throw "Missing build file: $name" }
     Copy-Item -LiteralPath (Join-Path $build $name) -Destination $app
 }
@@ -230,3 +230,6 @@ $hash = (Get-FileHash -LiteralPath $package -Algorithm SHA256).Hash.ToLowerInvar
 Write-Output "msix=$package"
 Write-Output "sha256=$hash"
 Write-Output "localValidationOnly=$LocalValidation signed=false deploymentTest=false wack=false"
+
+
+

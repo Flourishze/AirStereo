@@ -92,12 +92,17 @@ namespace AirStereo.Ui
         private LivePlaybackControl livePlayback;
         private bool streamReady;
         private string sessionState = "已选择";
+        private string currentCodec;
+        private string statusMessage = "正在准备…";
         private readonly AudioProfileController calibration = new AudioProfileController();
         private AudioProfile calibrationProfile = AudioProfile.Flat;
         private CalibrationForm calibrationForm;
         /// <summary>Set only on explicit exit or shutdown, never on popup dismissal.</summary>
         private bool exiting;
         internal bool OfflinePreview { get; set; }
+        internal int SourceSilenceDisconnectMilliseconds { get; set; } = Session.SessionOptions.DefaultSourceSilenceDisconnectMilliseconds;
+        internal bool UseAlac { get; set; } = true;
+        internal Session.SilenceFrameMode SilenceMode { get; set; } = Session.SilenceFrameMode.RepeatLast;
         private LatencyMode selectedMode = LatencyMode.Normal;
         private int customLatencyMs = LatencyProfile.NormalMs;
         /// <summary>Guards the radio buttons and the slider against echoing each other.</summary>
@@ -161,7 +166,9 @@ namespace AirStereo.Ui
         }
 
         /// <summary>Entry point for the window; returns a process exit code.</summary>
-        public static int Run(bool startInTray = false)
+        public static int Run(bool startInTray = false,
+            int sourceSilenceDisconnectMilliseconds = Session.SessionOptions.DefaultSourceSilenceDisconnectMilliseconds,
+            bool useAlac = true, Session.SilenceFrameMode silenceMode = Session.SilenceFrameMode.RepeatLast)
         {
             try
             {
@@ -182,7 +189,9 @@ namespace AirStereo.Ui
                 // with no taskbar button can otherwise remain at its construction state
                 // on some Windows/.NET combinations. The explicit show also gives
                 // NotifyIcon a native owner window before the first scan starts.
-                MainForm form = new MainForm { StartInTray = startInTray };
+                MainForm form = new MainForm { StartInTray = startInTray,
+                    SourceSilenceDisconnectMilliseconds = sourceSilenceDisconnectMilliseconds,
+                    UseAlac = useAlac, SilenceMode = silenceMode };
                 form.Show();
                 if (!startInTray) form.Activate();
                 Application.Run(form);
@@ -817,6 +826,7 @@ namespace AirStereo.Ui
             try { logBox.Font = new Font("Consolas", 9F); }
             catch (ArgumentException) { }
 
+            SetupLogFollow();
             box.Controls.Add(logBox);
             return box;
         }
@@ -829,6 +839,7 @@ namespace AirStereo.Ui
             titleFont = SafeBold(Font, Font.Size);
             KeyDown += OnKeyDown;
             LoadSettings();
+            InitializeStartupFeatures();
             // This is a borderless tray popup, so an invalid pre-handle DPI or a stale
             // layout pass must never leave it at a tiny fallback size. Re-apply a usable
             // minimum immediately before the first scan/display cycle.
@@ -836,7 +847,7 @@ namespace AirStereo.Ui
                 Math.Max(340, (int)Math.Round(340 * Math.Max(96, DeviceDpi) / 96.0)));
             UpdateCompactSize();
             PositionPopup();
-            BeginScan();
+            BeginScanCore(true);
         }
 
         private void OnKeyDown(object sender, KeyEventArgs arguments)
@@ -862,6 +873,7 @@ namespace AirStereo.Ui
             // signal. Wait for that cleanup before the process exits, otherwise a HomePod can
             // keep the old session in its AirPlay picker after this window is gone.
             WaitForPlaybackStop(10000);
+            localMute?.Restore();
             if (trayIcon != null) trayIcon.Visible = false;
             base.OnFormClosing(arguments);
         }
@@ -871,6 +883,7 @@ namespace AirStereo.Ui
             if (disposing && !OfflinePreview) FaultStore.Default.Activity("窗口生命周期：Dispose");
             if (disposing)
             {
+                DisposeFeatures();
                 if (dismissTimer != null) dismissTimer.Dispose();
                 if (settingsForm != null) settingsForm.Dispose();
                 if (uiTips != null) uiTips.Dispose();
@@ -949,6 +962,7 @@ namespace AirStereo.Ui
         private void OnDeviceCheckChanged(DeviceRow row)
         {
             if (selectionSyncing) return;
+            CancelAutoConnect("用户选择播放设备");
             string key = row.SelectionKey;
             if (row.Check.Checked)
             {
@@ -1050,7 +1064,19 @@ namespace AirStereo.Ui
         }
         private void BeginScan()
         {
-            if (scanning || playing) return;
+            CancelAutoConnect("用户手动扫描");
+            BeginScanCore(false);
+        }
+
+        private void BeginScanCore(bool automatic)
+        {
+            if (scanning || playing || OfflinePreview || exiting) return;
+            if (automatic && autoConnectPending)
+            {
+                if (autoConnectAttempts >= StartupConnectionPolicy.MaxAttempts || Environment.TickCount64 >= autoConnectDeadline)
+                { RecordFault("启动自动连接", "重试/超时上限已到，未降级连接；请手动扫描连接"); CancelAutoConnect("重试/超时上限已到"); return; }
+                autoConnectAttempts++;
+            }
             scanning = true;
             SetStatus("扫描中…");
             UpdateButtons();
@@ -1077,6 +1103,7 @@ namespace AirStereo.Ui
                     {
                         UpdateButtons();
                         if (scanFailure != null) SetStatus("连接失败 · 扫描失败");
+                        if (automatic) CompleteAutoConnectScan();
                     });
                 }
             });
@@ -1092,6 +1119,7 @@ namespace AirStereo.Ui
                 if (IsDisposed) return;
                 groups.Clear();
                 groups.AddRange(found.Groups);
+                RefreshAutoConnectDevices();
                 RebuildDeviceList();
 
                 foreach (string warning in found.Last.Warnings) Log("警告：" + warning);
@@ -1371,6 +1399,8 @@ namespace AirStereo.Ui
 
         private void StartPlayback(string kind)
         {
+            if (!autoStartingPlayback) CancelAutoConnect("用户手动播放");
+            if (OfflinePreview) return;
             if (playing)
             {
                 if ((kind == "left-check" || kind == "right-check") && streamReady && livePlayback != null)
@@ -1409,6 +1439,9 @@ namespace AirStereo.Ui
             if ((kind == "left-check" || kind == "right-check") && !route.SplitStereo)
                 playKind = "tone";
             PlayRequest request = new PlayRequest();
+            request.SourceSilenceDisconnectMilliseconds = SourceSilenceDisconnectMilliseconds;
+            request.UseAlac = UseAlac;
+            request.SilenceMode = SilenceMode;
             request.Kind = playKind;
             request.Mode = selectedMode;
             request.CustomLatencyMs = customLatencyMs;
@@ -1421,6 +1454,7 @@ namespace AirStereo.Ui
             if (livePlayback != null) livePlayback.Balance = request.Balance;
             request.LiveControl = livePlayback;
             streamReady = false;
+            muteAbandoned = false;
             if (kind == "left-check" || kind == "right-check") request.DurationMs = 3000;
 
             // Test tones must be audibly unambiguous. The user's balance is restored because
@@ -1430,6 +1464,7 @@ namespace AirStereo.Ui
             ManualResetEventSlim stopSignal = new ManualResetEventSlim(false);
             playStop = stopSignal;
             playing = true;
+            currentCodec = null;
             UpdateButtons();
             SetStatus(recoveringConnection
                 ? "恢复连接…"
@@ -1478,6 +1513,7 @@ namespace AirStereo.Ui
                         playing = false;
                         livePlayback = null;
                         streamReady = false;
+                        UpdateLocalMute();
                         recoveringConnection = failure != null;
                         Log(message);
                         if (playError != null) RecordFault("播放中断", failure, playError);
@@ -1494,6 +1530,7 @@ namespace AirStereo.Ui
 
         private void StopPlayback()
         {
+            CancelAutoConnect("用户停止播放");
             if (playStop != null)
             {
                 Log("正在停止播放并断开音箱…");
@@ -1504,6 +1541,8 @@ namespace AirStereo.Ui
         private void PlaybackLog(string message)
         {
             Log(message);
+            if (message.StartsWith("Codec diagnostics:", StringComparison.Ordinal))
+                UpdateCodecFromDiagnostics(message);
             if (message.StartsWith("warning:", StringComparison.OrdinalIgnoreCase) ||
                 message.StartsWith("PTP unavailable", StringComparison.OrdinalIgnoreCase) ||
                 message.Contains("event channel closed:", StringComparison.OrdinalIgnoreCase))
@@ -1514,7 +1553,7 @@ namespace AirStereo.Ui
                 SetStatus("缓冲中…");
             }
             else if (message.StartsWith("streaming ", StringComparison.OrdinalIgnoreCase))
-                Post(delegate { streamReady = true; UpdateButtons(); SetStatus("播放中"); });
+                Post(delegate { streamReady = true; UpdateLocalMute(); UpdateButtons(); SetStatus("播放中"); });
         }
 
         private void OpenCalibration()
@@ -1637,6 +1676,22 @@ namespace AirStereo.Ui
             else SetStatus("已选择");
         }
 
+        private void UpdateCodecFromDiagnostics(string message)
+        {
+            if (IsDisposed) return;
+            if (InvokeRequired)
+            {
+                Post(delegate { UpdateCodecFromDiagnostics(message); });
+                return;
+            }
+            if (!playing || !message.StartsWith("Codec diagnostics:", StringComparison.Ordinal)) return;
+            string codec = message.Contains(" actual=ALAC ", StringComparison.Ordinal) ? "ALAC"
+                : message.Contains(" actual=PCM ", StringComparison.Ordinal) ? "PCM" : null;
+            if (codec == null || !message.Contains(" setup=accepted ", StringComparison.Ordinal)) return;
+            currentCodec = codec;
+            SetStatus(statusMessage);
+        }
+
         private void SetStatus(string message)
         {
             if (IsDisposed) return;
@@ -1645,11 +1700,21 @@ namespace AirStereo.Ui
                 Post(delegate { SetStatus(message); });
                 return;
             }
-            statusLabel.Text = message;
+            statusMessage = message;
+            if (!playing || message.StartsWith("连接失败", StringComparison.Ordinal) || message == "已停止")
+                currentCodec = null;
+            string visibleStatus = message + (currentCodec != null ? " · " + currentCodec : "");
+            statusLabel.Text = visibleStatus;
             if (message.StartsWith("连接失败", StringComparison.Ordinal)) sessionState = "连接失败";
             else if (message == "已停止") sessionState = "已停止";
-            if (popupStatus != null) popupStatus.Text = message;
-            if (uiTips != null && popupStatus != null) uiTips.SetToolTip(popupStatus, message);
+            if (popupStatus != null) popupStatus.Text = visibleStatus;
+            if (uiTips != null && popupStatus != null) uiTips.SetToolTip(popupStatus,
+                visibleStatus + (currentCodec != null ? "（当前发送编码）" : ""));
+            if (trayIcon != null)
+            {
+                string tip = "AirStereo · " + (currentCodec != null ? "当前编码 " + currentCodec + " · " : "") + message;
+                trayIcon.Text = tip.Length > 63 ? tip.Substring(0, 63) : tip;
+            }
             UpdateDeviceRows();
         }
 
@@ -1666,18 +1731,7 @@ namespace AirStereo.Ui
             if (!OfflinePreview) FaultStore.Default.Activity(line);
             lock (logGate)
             {
-                logBox.AppendText(line + Environment.NewLine);
-                if (logBox.TextLength > 400000)
-                {
-                    logBox.Text = logBox.Text.Substring(logBox.TextLength - 200000);
-                    // TextBoxBase keeps an undo snapshot when Text is replaced.  The log is a
-                    // rolling diagnostic view, so retaining every discarded snapshot becomes a
-                    // second unbounded history while the app is hidden in the tray.
-                    logBox.ClearUndo();
-                }
-                logBox.SelectionStart = logBox.TextLength;
-                logBox.ScrollToCaret();
-                logBox.Refresh();
+                AppendLogView(line);
             }
             try
             {
@@ -1746,6 +1800,7 @@ namespace AirStereo.Ui
             {
                 string path = SettingsPath();
                 if (!File.Exists(path)) return;
+                featureSettingsSyncing = true;
                 LatencyMode savedMode = LatencyMode.Realtime;
                 int savedCustom = customLatencyMs;
                 bool haveSavedMode = false;
@@ -1755,7 +1810,11 @@ namespace AirStereo.Ui
                     if (equals <= 0) continue;
                     string key = line.Substring(0, equals).Trim();
                     string value = line.Substring(equals + 1).Trim();
-                    if (key == "selectedDevices") LoadSelectedDevices(value);
+                    if (key == "muteLocalOutput") muteLocalOutputBox.Checked = value == "1";
+                    else if (key == "autoConnect") autoConnectBox.Checked = value == "1";
+                    else if (key == "autoConnectDevices")
+                    { autoConnectIdentities.Clear(); autoConnectIdentities.AddRange(StartupConnectionPolicy.Decode(value)); }
+                    else if (key == "selectedDevices") LoadSelectedDevices(value);
                     else if (key == "stereoBalance" && int.TryParse(value, out int balance))
                         balancePreference = Math.Max(-100, Math.Min(100, balance));
                     else if (key == "volume" && int.TryParse(value, out int volume) && volume >= 0 && volume <= 100)
@@ -1794,19 +1853,25 @@ namespace AirStereo.Ui
                 UpdateRouteUi();
                 if (haveSavedMode) ApplyLatencySettings(savedMode, savedCustom);
                 ApplySavedCalibration();
+                RefreshAutoConnectDevices();
             }
             catch (Exception error)
             {
                 Log("读取设置失败（忽略）：" + error.Message);
                 RecordFault("设置读取失败", error.Message, error);
             }
+            finally { featureSettingsSyncing = false; }
         }
 
         private void SaveSettings()
         {
+            if (OfflinePreview) return;
             try
             {
                 File.WriteAllText(SettingsPath(),
+                    "muteLocalOutput=" + (muteLocalOutputBox.Checked ? "1" : "0") + Environment.NewLine +
+                    "autoConnect=" + (autoConnectBox.Checked ? "1" : "0") + Environment.NewLine +
+                    "autoConnectDevices=" + StartupConnectionPolicy.Encode(autoConnectIdentities) + Environment.NewLine +
                     "volume=" + volumeBar.Value.ToString(CultureInfo.InvariantCulture) + Environment.NewLine +
                     "selectedDevices=" + SaveSelectedDevices() + Environment.NewLine +
                     "stereoBalance=" + balancePreference.ToString(CultureInfo.InvariantCulture) + Environment.NewLine +

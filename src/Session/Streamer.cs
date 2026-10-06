@@ -38,6 +38,8 @@ namespace AirStereo.Session
 
         public Streamer(List<Receiver> targets, SessionOptions options, Action<string> log)
         {
+            if (options.SourceSilenceDisconnectMilliseconds <= 0)
+                throw new ProtocolException("source silence disconnect milliseconds must be positive");
             this.targets = targets;
             this.options = options;
             this.log = log ?? delegate { };
@@ -202,6 +204,8 @@ namespace AirStereo.Session
             byte[] pcm = new byte[frames * 2 * 2];
             byte[] leftPcm = options.SplitStereo ? new byte[pcm.Length] : null;
             byte[] rightPcm = options.SplitStereo ? new byte[pcm.Length] : null;
+            ContinuousSilencePolicy silencePolicy = new ContinuousSilencePolicy(
+                options.SourceSilenceDisconnectMilliseconds, options.SilenceMode, block.Length);
             Stopwatch clockWatch = Stopwatch.StartNew();
             double durationMilliseconds = durationMs > 0 ? durationMs : double.PositiveInfinity;
             long sentFrames = 0;
@@ -246,7 +250,9 @@ namespace AirStereo.Session
             // was playing while the session was set up. Only the newest audio is worth sending.
             source.Prepare();
 
-            log("streaming " + source.SampleRate + " Hz, buffer " +
+            log("streaming " + (options.UseAlac ? "ALAC" : "PCM fallback") + " " + source.SampleRate +
+                " Hz, continuous media, silence " + options.SilenceMode + ", source-silence timeout " +
+                options.SourceSilenceDisconnectMilliseconds + " ms, buffer " +
                 bufferMilliseconds.ToString("0", CultureInfo.InvariantCulture) + " ms (" +
                 sessions[0].NegotiatedLatencySource + "), pacing " +
                 (PrecisionWait.HighResolution ? "high resolution timer" : "system timer") +
@@ -284,7 +290,17 @@ namespace AirStereo.Session
                     if (gap > worstGapMilliseconds) worstGapMilliseconds = gap;
                 }
                 lastSendMilliseconds = now;
-                if (lateness > lateLimitMilliseconds)
+                // Read before deciding whether to skip. A live loopback source can
+                // be Starved when the render endpoint is idle; that is source silence,
+                // not a slow sender. The block is already zero-filled by Read(), and
+                // must still occupy this media slot so the receiver buffer and RTP
+                // timeline continue advancing.
+                source.Read(block, frames);
+                AudioReadActivity readActivity = source.LastReadActivity;
+                bool disconnectForSilence = silencePolicy.Process(block, source.IsRealtime,
+                    readActivity, frames, source.SampleRate);
+
+                if (lateness > lateLimitMilliseconds && readActivity != AudioReadActivity.Starved)
                 {
                     long behindFrames = (long)((now - dueMilliseconds) * source.SampleRate / 1000.0);
                     int skip = (int)(behindFrames / frames);
@@ -298,17 +314,15 @@ namespace AirStereo.Session
                     }
                     continue;
                 }
-
-                source.Read(block, frames);
                 if (options.SwapChannels) StereoRouting.SwapInPlace(block);
                 if (options.LiveControl != null) options.LiveControl.ApplyBalance(block);
                 else if (options.Balance != 0) StereoRouting.ApplyBalanceInPlace(block, options.Balance);
+
                 if (options.SplitStereo) StereoRouting.Split(block, leftPcm, rightPcm, 0);
                 else AudioSource.ToBigEndianPcm(block, block.Length, pcm);
                 ulong nowNanoseconds = clock.NowNanoseconds;
                 bool sync = now >= nextSyncMilliseconds;
                 if (sync) nextSyncMilliseconds = now + syncIntervalMilliseconds;
-
                 for (int member = 0; member < sessions.Count; member++)
                 {
                     byte[] channel = options.SplitStereo ? (member == 0 ? leftPcm : rightPcm) : pcm;
@@ -318,6 +332,7 @@ namespace AirStereo.Session
                 foreach (ReceiverSession session in sessions)
                 {
                     session.Service();
+                    CheckReceiverHealth(session.Describe(), session.ConsecutiveMediaSendFailures, session.FeedbackFailures, targets.Count > 1);
                 }
                 double sendCost = clockWatch.Elapsed.TotalMilliseconds - now;
                 if (sendCost > 2.0) slowSends++;
@@ -326,6 +341,12 @@ namespace AirStereo.Session
                 sentFrames += frames;
                 packets++;
                 first = false;
+                if (disconnectForSilence)
+                {
+                    log("source silence confirmed for " + options.SourceSilenceDisconnectMilliseconds +
+                        " ms: final media packet sent; graceful TEARDOWN");
+                    break;
+                }
 
                 if (now >= nextReportMilliseconds)
                 {
@@ -409,7 +430,24 @@ namespace AirStereo.Session
             return (uint)(bytes[0] << 24 | bytes[1] << 16 | bytes[2] << 8 | bytes[3]);
         }
 
-        /// <summary>Root mean square of one block, as a rough "is anything playing" indicator.</summary>
+        /// <summary>
+        /// Ignores the small quantization/noise floor produced by WASAPI loopback while
+        /// still rejecting an activity-bearing block reported as silence by the source.
+        /// </summary>
+        internal static bool HasAudioActivity(short[] block)
+        {
+            if (block == null || block.Length == 0) return false;
+            int peak = 0;
+            double energy = 0.0;
+            for (int i = 0; i < block.Length; i++)
+            {
+                int sample = Math.Abs((int)block[i]);
+                if (sample > peak) peak = sample;
+                energy += (double)sample * sample;
+            }
+            double rms = Math.Sqrt(energy / block.Length);
+            return (peak >= 48 && rms >= 8.0) || rms >= 12.0;
+        }
         private static double Level(short[] block)
         {
             double sum = 0.0;

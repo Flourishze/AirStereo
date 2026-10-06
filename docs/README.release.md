@@ -6,7 +6,7 @@
 	<img src="https://get.microsoft.com/images/zh-cn%20dark.svg" width="200"/>
 </a>
 
-Windows x64 AirPlay 音频发送应用。当前版本 **1.0.4**，源码与独立安装版的发布及更新来源为 [Flourishze/AirStereo](https://github.com/Flourishze/AirStereo)；商店版由 Microsoft Store 管理更新。
+Windows x64 AirPlay 音频发送应用。当前版本 **1.0.5**，源码与独立安装版的发布及更新来源为 [Flourishze/AirStereo](https://github.com/Flourishze/AirStereo)；商店版由 Microsoft Store 管理更新。
 
 ## 软件用途
 
@@ -47,7 +47,7 @@ Windows x64 AirPlay 音频发送应用。当前版本 **1.0.4**，源码与独�
 EXE 提供安装向导，MSI 适合部署。商店版请使用上方 Microsoft Store 入口，由商店负责签名与更新；Release 中未签名的 MSIX 用于商店提交。请勿同时运行商店版与独立安装版。
 
 
-从本仓库 Releases 下载 `AirStereo-Setup-1.0.4-x64.exe`，安装前从托盘菜单退出旧版。安装包附带 .NET Core 与 Windows Desktop 10.0.12 运行时，优先使用安装目录内的运行时。无需另装 .NET 运行时；仍需要受 .NET 10 支持的 Windows x64 系统。
+从本仓库 Releases 下载 `AirStereo-Setup-1.0.5-x64.exe`，安装前从托盘菜单退出旧版。安装包附带 .NET Core 与 Windows Desktop 10.0.12 运行时，优先使用安装目录内的运行时。无需另装 .NET 运行时；仍需要受 .NET 10 支持的 Windows x64 系统。
 
 1. 点击右下角 AirStereo 托盘图标，扫描并勾选音响。
 2. 未选择时不能播放；选择一只独立音响时发送完整立体声，并禁用左右平衡。
@@ -59,7 +59,7 @@ EXE 提供安装向导，MSI 适合部署。商店版请使用上方 Microsoft S
 
 无线播放存在采集、网络传输和接收端缓冲延迟，延迟设置值不等于端到端实测延迟。AirStereo 不承诺零延迟，也不能替代需要极低延迟的游戏或实时监听设备。
 
-## 1.0.4 更新重点
+## 1.0.5 更新重点
 
 - 采集与重采样缓冲设置上限，并清理已丢弃日志的撤销历史，改善长时间运行的内存稳定性。
 - 修复首次打开托盘窗口后点击桌面无法自动收回的问题。
@@ -82,7 +82,7 @@ EXE 提供安装向导，MSI 适合部署。商店版请使用上方 Microsoft S
 
 ## 构建与文档
 
-详见 [构建说明](BUILD.md)、[验收清单](TESTING.md)、[更新记录](../CHANGELOG.md) 和 [1.0.4 发布说明](releases/v1.0.4.md)。应用源码与打包脚本提供；既有安装向导的原始源码未保留，因此打包仍依赖明确标注的二进制模板。
+详见 [构建说明](BUILD.md)、[验收清单](TESTING.md)、[更新记录](../CHANGELOG.md) 和 [1.0.5 发布说明](releases/v1.0.5.md)。应用源码与打包脚本提供；既有安装向导的原始源码未保留，因此打包仍依赖明确标注的二进制模板。
 
 ## 许可说明
 
@@ -91,3 +91,4 @@ AirStereo 自有代码与文档采用 [MIT 许可证](../LICENSE)，Copyright (c
 第三方代码、依赖、.NET 运行时与安装器二进制模板不因本仓库采用 MIT 而变更许可，仍须遵守各自的许可条款。随安装包分发的 .NET 运行时保留其原有 LICENSE 与 ThirdPartyNotices。
 
 AirStereo 是独立项目，非 Apple 官方应用。AirPlay、HomePod 等商标属于各自权利人。
+

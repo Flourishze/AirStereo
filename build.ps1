@@ -75,6 +75,20 @@ foreach ($source in $sources) { $cscArgs.Add($source) }
 & $compiler $cscArgs
 if ($LASTEXITCODE -ne 0) { throw "compilation failed with exit code $LASTEXITCODE" }
 
+# ALAC is an x64 native dependency for the experimental 1.0.5 build. Keep the
+# DLL and its license beside the managed output; do not silently produce a PCM-
+# only build when the native dependency is missing.
+$nativeSource = Join-Path $root 'src\native\LibALAC64.dll'
+$licenseSource = Join-Path $root 'src\native\LibALAC-LICENSE.txt'
+if (-not (Test-Path $nativeSource)) {
+    throw 'src\native\LibALAC64.dll is required for ALAC builds.'
+}
+if (-not (Test-Path $licenseSource)) {
+    throw 'src\native\LibALAC-LICENSE.txt is required for ALAC builds.'
+}
+Copy-Item $nativeSource (Join-Path $outputDirectory 'LibALAC64.dll') -Force
+Copy-Item $licenseSource (Join-Path $outputDirectory 'LibALAC-LICENSE.txt') -Force
+
 # Both frameworks have to be named, otherwise the loader cannot find System.Windows.Forms.
 $runtimeConfig = Join-Path $outputDirectory 'AirStereo.runtimeconfig.json'
 $runtimeOptions = @{ runtimeOptions = @{

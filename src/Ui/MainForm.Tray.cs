@@ -255,6 +255,7 @@ namespace AirStereo.Ui
             commands.Controls.Add(patternButton, 0, 0);
             commands.Controls.Add(calibrationButton, 1, 0);
             options.Controls.Add(commands, 0, 2);
+            options.Controls.Add(BuildMuteLocalOutput(), 0, 3);
             settingsAudioPage = audio;
             audio.Controls.Add(options);
             logs.Controls.Add(BuildLogBox());
@@ -311,13 +312,14 @@ namespace AirStereo.Ui
             // form, which is exactly the clipped 175%/200% symptom.
             int latencyHeight = modeRow * 3 + sliderRow + valueRow + hintRow + 88;
             int commandHeight = Math.Max(DpiPixels(56), text + DpiPixels(26));
+            int muteHeight = Math.Max(DpiPixels(40), text + DpiPixels(16));
 
-            settingsOptions.Height = routeHeight + latencyHeight + commandHeight + 8;
+            settingsOptions.Height = routeHeight + latencyHeight + commandHeight + muteHeight + 8;
             settingsOptions.RowStyles.Clear();
             settingsOptions.RowStyles.Add(new RowStyle(SizeType.Absolute, routeHeight));
             settingsOptions.RowStyles.Add(new RowStyle(SizeType.Absolute, latencyHeight));
             settingsOptions.RowStyles.Add(new RowStyle(SizeType.Absolute, commandHeight));
-            settingsOptions.RowStyles.Add(new RowStyle(SizeType.Absolute, 8));
+            settingsOptions.RowStyles.Add(new RowStyle(SizeType.Absolute, muteHeight + 8));
 
             if (settingsLatencyTable != null)
             {
@@ -370,12 +372,16 @@ namespace AirStereo.Ui
                 settingsRouteBox.MinimumSize = new Size(0, routeHeight - settingsRouteBox.Margin.Vertical);
                 settingsOptions.RowStyles[0].Height = routeHeight;
             }
-            settingsOptions.Height = routeHeight + latencyMinimum + commandHeight + 8;
+            settingsOptions.Height = routeHeight + latencyMinimum + commandHeight + muteHeight + 8;
             settingsGeneralGrid?.RowStyles.Clear();
             if (settingsGeneralGrid != null)
             {
                 for (int i = 0; i < 4; i++) settingsGeneralGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, Math.Max(DpiPixels(44), text + DpiPixels(20))));
                 settingsGeneralGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+                if (autoConnectBox != null) autoConnectBox.Height = Math.Max(DpiPixels(38), text + DpiPixels(16));
+                if (autoConnectHint != null) autoConnectHint.Height = Math.Max(DpiPixels(38), text + DpiPixels(16));
+                int autoHeight = (autoConnectBox?.Height ?? 38) + (autoConnectHint?.Height ?? 38) + Math.Max(DpiPixels(110), text * 4);
+                settingsGeneralGrid.Height = 4 * Math.Max(DpiPixels(44), text + DpiPixels(20)) + autoHeight + DpiPixels(12);
             }
             if (settingsFaultGrid != null)
             {

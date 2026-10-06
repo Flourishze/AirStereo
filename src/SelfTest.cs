@@ -32,8 +32,11 @@ namespace AirStereo
             RecordLayer();
             PlistRoundTrip();
             TimingAndAudioLayout();
+            SetupAudioFormat();
             ResamplerQuality();
             LatencyProfileMapping();
+            ContinuousMediaOptions();
+            AlacRoundTripAndContinuity();
             CalibrationDsp();
             StereoRoutingDsp();
             Grouping();
@@ -41,11 +44,202 @@ namespace AirStereo
             NativePairDiscovery();
             SessionFailurePolicy();
             LivePlaybackDsp();
+            Ui.FeatureRegressionTests.RunPure(Check);
             Ui.UiRegressionTests.Run(Check);
 
             Console.WriteLine();
             Console.WriteLine(checks + " checks, " + failures + " failure" + (failures == 1 ? "" : "s"));
             return failures == 0 ? 0 : 1;
+        }
+
+        private static void ContinuousMediaOptions()
+        {
+            var defaults = new Session.SessionOptions();
+            Check("default codec is ALAC with 90-minute capture-confirmed timeout",
+                defaults.UseAlac && defaults.SourceSilenceDisconnectMilliseconds == 5400000 &&
+                defaults.SilenceMode == Session.SilenceFrameMode.RepeatLast);
+            Check("API defaults match session", new PlayRequest().UseAlac &&
+                new PlayRequest().SourceSilenceDisconnectMilliseconds == 5400000);
+            string diag = Session.ReceiverSession.CodecDiagnostics(true,true,44100,24);
+            Check("codec diagnostics expose sender format after SETUP without claiming audibility",
+                diag.Contains("requested=ALAC actual=ALAC") && diag.Contains("sampleRate=44100 framesPerPacket=352 channels=2") &&
+                diag.Contains("ascBytes=24") && diag.Contains("ct=2") && diag.Contains("receiverAudio=not-verified"));
+            Check("PCM diagnostic identifies explicit experimental override", Session.ReceiverSession.CodecDiagnostics(false,false,48000,0).Contains("reason=experimental-pcm-override") &&
+                Session.ReceiverSession.CodecDiagnostics(false,false,48000,0).Contains("ct=1"));
+            string[] original = { "play", "--target", "speaker", "--rate", "48000" };
+            var parsed = Program.ParseMediaArguments(original, out string[] remaining);
+            Check("media parser preserves original play options", parsed.UseAlac &&
+                string.Join("|", remaining) == string.Join("|", original));
+            parsed = Program.ParseMediaArguments(new[] { "gui", "--pcm", "--silence-mode=zero",
+                "--silence-disconnect-ms", "1000", "--tray" }, out remaining);
+            Check("GUI experiment options reach PCM/zero/custom timeout", !parsed.UseAlac &&
+                parsed.SilenceMode == Session.SilenceFrameMode.Zero &&
+                parsed.SourceSilenceDisconnectMilliseconds == 1000 && string.Join("|", remaining) == "gui|--tray");
+            parsed = Program.ParseMediaArguments(new[] { "gui", "--SILENCE-MODE", "repeat-last",
+                "--silence-disconnect-ms=2147483647" }, out remaining);
+            Check("media options case-insensitive and positive int range", parsed.UseAlac &&
+                parsed.SourceSilenceDisconnectMilliseconds == int.MaxValue);
+            string[][] invalid = {
+                new[] { "gui", "--standby-ms=3000" }, new[] { "gui", "--standby-ms", "20000" },
+                new[] { "gui", "--silence-disconnect-ms" }, new[] { "gui", "--silence-disconnect-ms=0" },
+                new[] { "gui", "--silence-disconnect-ms=-1" }, new[] { "gui", "--silence-disconnect-ms=2147483648" },
+                new[] { "gui", "--silence-disconnect-ms=1.5" }, new[] { "gui", "--silence-disconnect-ms=abc" },
+                new[] { "gui", "--silence-mode=unknown" }, new[] { "gui", "--silence-mode" },
+                new[] { "gui", "--pcm=true" }, new[] { "gui", "--pcm", "--pcm" },
+                new[] { "gui", "--silence-mode=zero", "--silence-mode=repeat-last" },
+                new[] { "gui", "--silence-disconnect-ms=100", "--silence-disconnect-ms", "100" }
+            };
+            for (int i = 0; i < invalid.Length; i++)
+            {
+                bool rejected = false;
+                try { Program.ParseMediaArguments(invalid[i], out remaining); }
+                catch (ProtocolException) { rejected = true; }
+                Check("media parser rejects invalid/duplicate/retired H2 #" + i, rejected);
+            }
+            bool sessionRejected = false, requestRejected = false;
+            try { new Session.Streamer(new List<Receiver>(),
+                new Session.SessionOptions { SourceSilenceDisconnectMilliseconds = 0 }, null); }
+            catch (ProtocolException) { sessionRejected = true; }
+            try { AirStereoApi.Play(new ReceiverGroup(),
+                new PlayRequest { SourceSilenceDisconnectMilliseconds = -1 }, null, null); }
+            catch (ProtocolException) { requestRejected = true; }
+            Check("bad timeout fails before capture/network", sessionRejected && requestRejected);
+
+            short[] zero = new short[704];
+            short[] quiet = new short[704]; Array.Fill(quiet, (short)1);
+            short[] boundary = new short[704]; Array.Fill(boundary, (short)12);
+            short[] peak = new short[704]; peak[0] = 48;
+            short[] music = new short[704]; Array.Fill(music, (short)1000);
+            short[] minimum = new short[704]; minimum[0] = short.MinValue;
+            Check("activity null/empty/zero inactive", !Session.Streamer.HasAudioActivity(null) &&
+                !Session.Streamer.HasAudioActivity(Array.Empty<short>()) && !Session.Streamer.HasAudioActivity(zero));
+            Check("activity low-level nonzero stays below detector", !Session.Streamer.HasAudioActivity(quiet));
+            Check("activity peak alone below RMS is not enough", !Session.Streamer.HasAudioActivity(peak));
+            Check("activity RMS boundary is active", Session.Streamer.HasAudioActivity(boundary));
+            Array.Clear(boundary); boundary[0] = 48; boundary[1] = 48;
+            Check("activity peak and RMS joint threshold", !Session.Streamer.HasAudioActivity(boundary));
+            Array.Fill(boundary, (short)0); for (int i = 0; i < 20; i++) boundary[i] = 48;
+            Check("activity peak48 RMS8 crosses threshold", Session.Streamer.HasAudioActivity(boundary));
+            Check("activity normal music and short.MinValue safe", Session.Streamer.HasAudioActivity(music) &&
+                Session.Streamer.HasAudioActivity(minimum));
+            Check("capture aggregate full confirmed silence", LoopbackSource.AggregateReadActivity(704,704,false,false) == AudioReadActivity.ConfirmedSilent);
+            Check("capture aggregate active dominates unknown", LoopbackSource.AggregateReadActivity(704,704,true,true) == AudioReadActivity.Active);
+            Check("capture aggregate unknown does not count", LoopbackSource.AggregateReadActivity(704,704,false,true) == AudioReadActivity.Unknown);
+            Check("capture padded zeros are starved not silence", LoopbackSource.AggregateReadActivity(700,704,false,false) == AudioReadActivity.Starved);
+            foreach (Session.SilenceFrameMode mode in Enum.GetValues<Session.SilenceFrameMode>())
+            {
+                var policy = new Session.ContinuousSilencePolicy(1000, mode, 704);
+                Check("silence requires consecutive captured frames " + mode,
+                    !policy.Process(zero,true,AudioReadActivity.ConfirmedSilent,352,44100) && policy.SilentMilliseconds > 7);
+                Check("quiet nonzero marked active cannot trigger disconnect " + mode,
+                    !policy.Process(quiet,true,AudioReadActivity.Active,352,44100) && policy.SilentMilliseconds == 0);
+                policy.Process(zero,true,AudioReadActivity.ConfirmedSilent,352,44100);
+                Check("unknown resets confirmed timer " + mode,
+                    !policy.Process(zero,true,AudioReadActivity.Unknown,352,44100) && policy.SilentMilliseconds == 0);
+                policy.Process(zero,true,AudioReadActivity.ConfirmedSilent,352,44100);
+                Check("starved resets confirmed timer " + mode,
+                    !policy.Process(zero,true,AudioReadActivity.Starved,352,44100) && policy.SilentMilliseconds == 0);
+                Check("activity vetoes wrong silent metadata " + mode,
+                    !policy.Process(music,true,AudioReadActivity.ConfirmedSilent,352,44100) && music[0] == 1000);
+                Check("test/file source does not expire by age " + mode,
+                    !policy.Process(zero,false,AudioReadActivity.ConfirmedSilent,352,44100) && policy.SilentMilliseconds == 0);
+                short[] silent = new short[704];
+                policy.Process(silent,true,AudioReadActivity.ConfirmedSilent,352,44100);
+                Check("silence never replays last audible music " + mode, silent[0] == 0);
+                int untilDisconnect = 1;
+                while (!policy.Process(silent,true,AudioReadActivity.ConfirmedSilent,352,44100) && untilDisconnect < 150) untilDisconnect++;
+                Check("continuous confirmed silence expires on frame boundary " + mode, untilDisconnect == 125 && policy.SilentMilliseconds >= 1000);
+                Check("real activity resets expired timer " + mode,
+                    !policy.Process(music,true,AudioReadActivity.Active,352,44100) && policy.SilentMilliseconds == 0);
+            }
+        }
+
+        [System.Runtime.InteropServices.DllImport("LibALAC64.dll", CallingConvention = System.Runtime.InteropServices.CallingConvention.Cdecl, ExactSpelling = true)]
+        private static extern IntPtr InitializeDecoderWithCookie(byte[] cookie, int length);
+        [System.Runtime.InteropServices.DllImport("LibALAC64.dll", CallingConvention = System.Runtime.InteropServices.CallingConvention.Cdecl, ExactSpelling = true)]
+        private static extern int Decode(IntPtr decoder, byte[] input, byte[] output, ref int length);
+        [System.Runtime.InteropServices.DllImport("LibALAC64.dll", CallingConvention = System.Runtime.InteropServices.CallingConvention.Cdecl, ExactSpelling = true)]
+        private static extern int FinishDecoder(IntPtr decoder);
+
+        private static void AlacRoundTripAndContinuity()
+        {
+            try
+            {
+                foreach (int rate in new[] { 44100, 48000 })
+                using (var encoder = new NativeAlacEncoder(rate))
+                {
+                    NativeAlacEncoder.ParseMagicCookie(encoder.MagicCookie, encoder.MagicCookie.Length,
+                        out int sr, out int ch, out int bits, out int frames);
+                    Check("ALAC cookie geometry " + rate, sr == rate && ch == 2 && bits == 16 && frames == 352);
+                    IntPtr decoder = InitializeDecoderWithCookie(encoder.MagicCookie, encoder.MagicCookie.Length);
+                    Check("native decoder initializes " + rate, decoder != IntPtr.Zero);
+                    if (decoder == IntPtr.Zero) continue;
+                    try
+                    {
+                        byte[] networkPcm = new byte[1408], expectedNative = new byte[1408], decoded = new byte[1408];
+                        var rng = new Random(352);
+                        for (int input = 0; input < 5; input++)
+                        {
+                            for (int sample = 0; sample < 704; sample++)
+                            {
+                                // An independent numerical sample vector catches endian swaps that
+                                // a same-byte-stream round-trip cannot: +1 must not become +256.
+                                short value = input == 0 ? (short)0 : input == 1 ? (short)(sample % 2 == 0 ? 1 : -1234) :
+                                    input == 2 ? (short)(sample % 2 == 0 ? short.MinValue : short.MaxValue) :
+                                    input == 3 ? (short)(10000 * Math.Sin(sample * 0.17)) : (short)rng.Next(short.MinValue, short.MaxValue + 1);
+                                System.Buffers.Binary.BinaryPrimitives.WriteInt16BigEndian(networkPcm.AsSpan(sample * 2), value);
+                                System.Buffers.Binary.BinaryPrimitives.WriteInt16LittleEndian(expectedNative.AsSpan(sample * 2), value);
+                            }
+                            byte[] original = (byte[])networkPcm.Clone();
+                            int length = encoder.Encode(networkPcm);
+                            Check("ALAC length bound " + rate + " vector " + input, length > 0 && length <= NativeAlacEncoder.MaxEncodedBytes);
+                            int result = Decode(decoder, encoder.OutputBuffer, decoded, ref length);
+                            Check("ALAC numeric sample round-trip " + rate + " vector " + input,
+                                result == 0 && length == 1408 && expectedNative.AsSpan().SequenceEqual(decoded));
+                            Check("ALAC keeps caller's network PCM unchanged " + rate + " vector " + input, original.AsSpan().SequenceEqual(networkPcm));
+                        }
+                        bool rejected = false;
+                        try { encoder.Encode(new byte[1407]); } catch (ArgumentException) { rejected = true; }
+                        Check("ALAC rejects incomplete PCM " + rate, rejected);
+                    }
+                    finally { FinishDecoder(decoder); }
+                }
+                byte[] key1 = new byte[32], key2 = new byte[32]; key2[0] = 42;
+                using (var a = new AudioPacketizer(key1,10,1000,0x12345678,44100,true))
+                using (var b = new AudioPacketizer(key2,50,2000,0x87654321,44100,true))
+                {
+                    byte[] pcm = new byte[1408];
+                    DateTime start = new DateTime(2026,10,6,0,0,0,DateTimeKind.Utc);
+                    bool continuous = true;
+                    foreach (Session.SilenceFrameMode mode in Enum.GetValues<Session.SilenceFrameMode>())
+                    {
+                        var policy = new Session.ContinuousSilencePolicy(5400000,mode,704);
+                        var silent = new short[704];
+                        for (int i = 0; i < 1253; i++) // >10s of silence, never suppress a media slot
+                        {
+                            ushort sequence = a.Sequence; uint timestamp = a.Timestamp;
+                            bool expired = policy.Process(silent,true,AudioReadActivity.ConfirmedSilent,352,44100);
+                            var packet = a.Packet(pcm,false,start.AddMilliseconds((a.PacketsSent+1)*8), start.AddMinutes(1));
+                            continuous &= !expired && a.Sequence == unchecked((ushort)(sequence+1)) &&
+                                a.Timestamp == timestamp+352 && System.Buffers.Binary.BinaryPrimitives.ReadUInt64LittleEndian(
+                                packet.Buffer.AsSpan(packet.Length-8)) == (ulong)(a.PacketsSent-1);
+                        }
+                    }
+                    Check("10s silence both modes retains media/sequence/timestamp/nonce continuity", continuous && a.PacketsSent == 2506);
+                    Check("independent ALAC session remains untouched", b.Sequence == 50 && b.Timestamp == 2000 && b.PacketsSent == 0);
+                    var pa = a.Packet(pcm,false); var pb = b.Packet(pcm,false);
+                    Check("independent ALAC keys/SSRC/sequence/ciphertext", a.Ssrc != b.Ssrc && a.Sequence != b.Sequence &&
+                        !pa.Buffer.AsSpan(12,pa.Length-36).SequenceEqual(pb.Buffer.AsSpan(12,pb.Length-36)));
+                    DateTime now = DateTime.UtcNow;
+                    new Random(55).NextBytes(pcm);
+                    var randomPacket = a.Packet(pcm,false,now,now.AddSeconds(1));
+                    ushort seq = unchecked((ushort)(a.Sequence-1));
+                    var status = a.Retransmit(seq,now.AddMilliseconds(1),out byte[] resend);
+                    Check("variable ALAC retransmit contains exact original media bytes", status == AudioPacketizer.RetransmitResult.Packet &&
+                        resend.Length == randomPacket.Length+4 && resend.AsSpan(4).SequenceEqual(randomPacket.Buffer.AsSpan(0,randomPacket.Length)));
+                }
+            }
+            catch (Exception error) { Check("ALAC round-trip and continuity no skips on native failure", false,error.ToString()); }
         }
 
         private static void Check(string name, bool condition, string detail = null)
@@ -898,6 +1092,72 @@ namespace AirStereo
             return receiver;
         }
 
+        private static void SetupAudioFormat()
+        {
+            byte[] key = new byte[32];
+            for (int i = 0; i < key.Length; ++i) key[i] = (byte)(i + 1);
+            foreach (bool useAlac in new[] { true, false })
+            {
+                foreach (int rate in new[] { 44100, 48000 })
+                {
+                    string label = "SETUP " + (useAlac ? "ALAC" : "PCM") + " " + rate;
+                    try
+                    {
+                        using (AudioPacketizer packetizer = new AudioPacketizer(key, 42, 123456,
+                            0x12345678U, rate, useAlac))
+                        {
+                            int latency = (int)AudioPacketizer.LatencySamples(250, rate);
+                            var stream = Session.ReceiverSession.CreateAudioStreamDescription(
+                                packetizer, key, 6000, latency);
+                            var request = new Dictionary<string, object>
+                            {
+                                ["streams"] = new List<object> { stream }
+                            };
+                            var decoded = Plist.AsDictionary(Plist.Read(Plist.Write(request)));
+                            var streams = Plist.AsList(decoded["streams"]);
+                            Check(label + " serializes one stream", streams.Count == 1);
+                            var wire = Plist.AsDictionary(streams[0]);
+                            Check(label + " declares matching compression type",
+                                Plist.Integer(wire, "ct") == (useAlac ? 2L : 1L));
+                            long format = useAlac ? (rate == 44100 ? 1L << 18 : 1L << 20)
+                                : (rate == 44100 ? 1L << 11 : 1L << 15);
+                            Check(label + " declares matching audioFormat",
+                                Plist.Integer(wire, "audioFormat") == format);
+                            Check(label + " retains sample rate and 352 frames",
+                                Plist.Integer(wire, "sr") == rate && Plist.Integer(wire, "spf") == 352);
+                            Check(label + " retains encryption key",
+                                ((byte[])wire["shk"]).AsSpan().SequenceEqual(key));
+                            Check(label + " retains control port and stream ID",
+                                Plist.Integer(wire, "controlPort") == 6000 &&
+                                Plist.Integer(wire, "streamConnectionID") == 0x12345678L);
+                            Check(label + " retains latency bounds",
+                                Plist.Integer(wire, "latencyMin") == latency &&
+                                Plist.Integer(wire, "latencyMax") == latency);
+                            Check(label + " retains existing real-time stream fields",
+                                Plist.Integer(wire, "type") == 96 && (bool)wire["isMedia"] &&
+                                !(bool)wire["supportsDynamicStreamID"] && (string)wire["audioMode"] == "default");
+                            if (useAlac)
+                            {
+                                byte[] cookie = (byte[])wire["asc"];
+                                Check(label + " sends the same encoder's cookie",
+                                    cookie.AsSpan().SequenceEqual(packetizer.MagicCookie));
+                                int result = NativeAlacEncoder.ParseMagicCookie(cookie, cookie.Length,
+                                    out int cookieRate, out int channels, out int bits, out int frames);
+                                Check(label + " cookie agrees with stream declaration",
+                                    result == 0 && cookieRate == rate && channels == 2 && bits == 16 && frames == 352);
+                            }
+                            else Check(label + " omits ALAC cookie", !wire.ContainsKey("asc"));
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Check(label + " constructs and serializes (native dependency required for ALAC)",
+                            false, ex.ToString());
+                    }
+                }
+            }
+        }
+
         private static void TimingAndAudioLayout()
         {
             byte[] timing = AudioPacketizer.TimingPacket(20000, 8820, 123456789UL, 456UL, true);
@@ -926,20 +1186,107 @@ namespace AirStereo
                 AudioPacketizer.PcmBytes == 1408);
 
             byte[] key = new byte[32];
-            using (AudioPacketizer packetizer = new AudioPacketizer(key, 7, 1000, 0x11223344, 44100))
+            byte[] pcm = new byte[AudioPacketizer.PcmBytes];
+            bool alacAvailable = false;
+            try
             {
-                byte[] packet = packetizer.Packet(new byte[AudioPacketizer.PcmBytes], true);
+                using (NativeAlacEncoder encoder = new NativeAlacEncoder(44100))
+                {
+                    alacAvailable = true;
+                    Check("native ALAC encoder constructs at 44100 Hz", true);
+                    using (NativeAlacEncoder encoder48000 = new NativeAlacEncoder(48000))
+                    {
+                        Check("native ALAC encoder constructs at 48000 Hz",
+                            encoder48000.MagicCookie.Length > 0);
+                    }
+                    Check("ALAC magic cookie is available", encoder.MagicCookie.Length > 0);
+                    Check("ALAC magic cookie parses",
+                        NativeAlacEncoder.ParseMagicCookie(encoder.MagicCookie, encoder.MagicCookie.Length,
+                            out int cookieRate, out int cookieChannels, out int cookieBits,
+                            out int cookieFrames) == 0);
+                    NativeAlacEncoder.ParseMagicCookie(encoder.MagicCookie, encoder.MagicCookie.Length,
+                        out cookieRate, out cookieChannels, out cookieBits, out cookieFrames);
+                    Check("ALAC magic cookie sample rate is 44100", cookieRate == 44100);
+                    Check("ALAC magic cookie has two channels", cookieChannels == 2);
+                    Check("ALAC magic cookie has 16-bit samples", cookieBits == 16);
+                    Check("ALAC magic cookie has 352 frames per packet", cookieFrames == 352);
+                    int encodedLength = encoder.Encode(pcm);
+                    Check("ALAC encoding succeeds", encodedLength > 0);
+                    Check("ALAC encoded length fits the pooled scratch buffer",
+                        encodedLength <= NativeAlacEncoder.MaxEncodedBytes,
+                        "length=" + encodedLength);
+                }
+            }
+            catch (Exception error)
+            {
+                Check("native ALAC encoder loads and reports a clear failure when unavailable",
+                    false, error.GetType().Name + ": " + error.Message);
+            }
+
+            if (alacAvailable)
+            {
+                using (AudioPacketizer packetizer = new AudioPacketizer(key, 7, 1000, 0x11223344, 44100, true))
+                {
+                    AudioPacketizer.PacketBuffer packet = packetizer.Packet(pcm, true);
+                    int alacPayloadLength = packet.Length - 12 - 16 - 8;
+                    Check("ALAC packet uses the actual variable payload length",
+                        alacPayloadLength > 0 && packet.Length == 12 + alacPayloadLength + 16 + 8,
+                        "length=" + packet.Length);
+                    Check("ALAC packet length is inside the pool capacity",
+                        packet.Length <= AudioPacketizer.MaxPacketBytes);
+                    Check("first audio packet sets the marker bit", (packet.Buffer[1] & 0x80) != 0);
+                    Check("sequence and timestamp are big endian",
+                        packet.Buffer[2] == 0 && packet.Buffer[3] == 7 && packet.Buffer[4] == 0 &&
+                        packet.Buffer[5] == 0 && packet.Buffer[6] == 0x03 && packet.Buffer[7] == 0xe8);
+
+                    // Decrypt the packet the way a receiver would: AAD is timestamp||ssrc, and the
+                    // trailing counter names the nonce. The ciphertext span must stop at Length,
+                    // never at the pooled buffer capacity.
+                    ulong counter = 0;
+                    for (int i = 0; i < 8; i++)
+                        counter |= (ulong)packet.Buffer[packet.Length - 8 + i] << (8 * i);
+                    Check("ALAC nonce counter starts at zero", counter == 0);
+
+                    byte[] plaintext = new byte[alacPayloadLength];
+                    byte[] nonce = new byte[12];
+                    System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(nonce.AsSpan(4), counter);
+                    using (ChaCha20Poly1305Compat aead = new ChaCha20Poly1305Compat(key))
+                    {
+                        aead.Decrypt(nonce, packet.Buffer.AsSpan(12, alacPayloadLength),
+                            packet.Buffer.AsSpan(12 + alacPayloadLength, 16), plaintext,
+                            packet.Buffer.AsSpan(4, 8));
+                    }
+                    Check("ALAC encrypted payload decrypts using its actual length",
+                        plaintext.Length == alacPayloadLength);
+
+                    DateTime sent = new DateTime(2026, 10, 6, 0, 0, 0, DateTimeKind.Utc);
+                    AudioPacketizer.PacketBuffer retransmitSource = packetizer.Packet(
+                        pcm, false, sent, sent.AddSeconds(1));
+                    AudioPacketizer.RetransmitResult retransmitResult = packetizer.Retransmit(
+                        8, sent.AddMilliseconds(1), out byte[] retransmit);
+                    Check("variable-length retransmit preserves the actual media length",
+                        retransmitResult == AudioPacketizer.RetransmitResult.Packet &&
+                        retransmit.Length == 4 + retransmitSource.Length &&
+                        retransmit[1] == 0xd6);
+                }
+            }
+
+            using (AudioPacketizer pcmPacketizer = new AudioPacketizer(key, 7, 1000,
+                0x11223344, 44100, false))
+            {
+                AudioPacketizer.PacketBuffer packet = pcmPacketizer.Packet(pcm, true);
                 Check("audio packet length is header + payload + tag + nonce",
                     packet.Length == 12 + AudioPacketizer.PcmBytes + 16 + 8, "length=" + packet.Length);
-                Check("first audio packet sets the marker bit", (packet[1] & 0x80) != 0);
+                Check("PCM fallback packet sets the marker bit", (packet.Buffer[1] & 0x80) != 0);
                 Check("sequence and timestamp are big endian",
-                    packet[2] == 0 && packet[3] == 7 && packet[4] == 0 && packet[5] == 0 &&
-                    packet[6] == 0x03 && packet[7] == 0xe8);
+                    packet.Buffer[2] == 0 && packet.Buffer[3] == 7 && packet.Buffer[4] == 0 &&
+                    packet.Buffer[5] == 0 && packet.Buffer[6] == 0x03 && packet.Buffer[7] == 0xe8);
 
                 // Decrypt the packet the way a receiver would: AAD is timestamp||ssrc, and the
                 // trailing counter names the nonce.
                 ulong counter = 0;
-                for (int i = 0; i < 8; i++) counter |= (ulong)packet[packet.Length - 8 + i] << (8 * i);
+                for (int i = 0; i < 8; i++)
+                    counter |= (ulong)packet.Buffer[packet.Length - 8 + i] << (8 * i);
                 Check("trailing nonce counter starts at zero", counter == 0);
 
                 byte[] plaintext = new byte[AudioPacketizer.PcmBytes];
@@ -947,8 +1294,9 @@ namespace AirStereo
                 System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(nonce.AsSpan(4), counter);
                 using (ChaCha20Poly1305Compat aead = new ChaCha20Poly1305Compat(key))
                 {
-                    aead.Decrypt(nonce, packet.AsSpan(12, AudioPacketizer.PcmBytes),
-                        packet.AsSpan(12 + AudioPacketizer.PcmBytes, 16), plaintext, packet.AsSpan(4, 8));
+                    aead.Decrypt(nonce, packet.Buffer.AsSpan(12, AudioPacketizer.PcmBytes),
+                        packet.Buffer.AsSpan(12 + AudioPacketizer.PcmBytes, 16), plaintext,
+                        packet.Buffer.AsSpan(4, 8));
                 }
                 Check("audio payload decrypts with the announced associated data",
                     plaintext.Length == AudioPacketizer.PcmBytes);
@@ -957,6 +1305,22 @@ namespace AirStereo
                 Check("retransmit requests parse",
                     AudioPacketizer.ParseRetransmitRequest(request, out ushort start, out ushort limit) &&
                     start == 0x0102 && limit == 3);
+            }
+
+            byte[] secondKey = new byte[32];
+            secondKey[0] = 1;
+            using (AudioPacketizer first = new AudioPacketizer(key, 10, 2000, 0x01020304, 44100, false))
+            using (AudioPacketizer second = new AudioPacketizer(secondKey, 20, 2000, 0x05060708, 44100, false))
+            {
+                AudioPacketizer.PacketBuffer firstPacket = first.Packet(pcm, true);
+                AudioPacketizer.PacketBuffer secondPacket = second.Packet(pcm, true);
+                Check("independent sessions keep independent sequence numbers",
+                    firstPacket.Buffer[2] != secondPacket.Buffer[2] || firstPacket.Buffer[3] != secondPacket.Buffer[3]);
+                Check("independent sessions keep independent SSRC values",
+                    firstPacket.Buffer[8] != secondPacket.Buffer[8]);
+                Check("independent sessions do not share ciphertext state",
+                    !firstPacket.Buffer.AsSpan(12, AudioPacketizer.PcmBytes).SequenceEqual(
+                        secondPacket.Buffer.AsSpan(12, AudioPacketizer.PcmBytes)));
             }
         }
     }

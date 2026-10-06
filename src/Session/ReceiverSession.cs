@@ -19,12 +19,18 @@ namespace AirStereo.Session
         /// working AirPlay 2 sender uses, and 0 asks the streamer to derive one instead.
         /// </summary>
         public const int DefaultSyncMs = 100;
+        /// <summary>Continuous, capture-confirmed source silence before graceful disconnect.</summary>
+        public const int DefaultSourceSilenceDisconnectMilliseconds = 90 * 60 * 1000;
 
         public string SenderName = "AirStereo";
         public string SenderId = "02:57:32:41:50:01";
         public int SampleRate = 44100;
         public int LatencyMs = 250;
         public int SyncMs = DefaultSyncMs;
+        public int SourceSilenceDisconnectMilliseconds = DefaultSourceSilenceDisconnectMilliseconds;
+        public SilenceFrameMode SilenceMode = SilenceFrameMode.RepeatLast;
+        /// <summary>Use native ALAC media encoding; --pcm is an experimental fallback.</summary>
+        public bool UseAlac = true;
         public bool UsePtp = true;
         public string GroupId;
         public bool SplitStereo;
@@ -129,7 +135,8 @@ namespace AirStereo.Session
             byte[] sequenceBytes = new byte[2];
             RandomNumberGenerator.Fill(sequenceBytes);
             ushort sequence = (ushort)(sequenceBytes[0] | (sequenceBytes[1] << 8));
-            packetizer = new AudioPacketizer(audioKey, sequence, initialRtpTimestamp, ssrc, options.SampleRate);
+            packetizer = new AudioPacketizer(audioKey, sequence, initialRtpTimestamp, ssrc, options.SampleRate,
+                options.UseAlac);
             Uri = string.Format(CultureInfo.InvariantCulture, "rtsp://{0}/{1}", local, ssrc);
 
             long eventPort = SetupSession(control, Uri, options, clockId, ntpPort, log);
@@ -148,28 +155,16 @@ namespace AirStereo.Session
 
             int latencySamples = (int)AudioPacketizer.LatencySamples(options.LatencyMs, options.SampleRate);
             RequestedLatencySamples = latencySamples;
-            Dictionary<string, object> stream = new Dictionary<string, object>
-            {
-                ["audioFormat"] = (long)AudioPacketizer.AudioFormat(false, options.SampleRate),
-                ["audioMode"] = "default",
-                ["controlPort"] = (long)((IPEndPoint)controlSocket.LocalEndPoint).Port,
-                ["ct"] = 1L,
-                ["isMedia"] = true,
-                ["latencyMin"] = (long)latencySamples,
-                ["latencyMax"] = (long)latencySamples,
-                ["shk"] = audioKey,
-                ["spf"] = (long)AudioPacketizer.FramesPerPacket,
-                ["sr"] = (long)options.SampleRate,
-                ["type"] = 96L,
-                ["supportsDynamicStreamID"] = false,
-                ["streamConnectionID"] = (long)ssrc
-            };
+            Dictionary<string, object> stream = CreateAudioStreamDescription(packetizer, audioKey,
+                ((IPEndPoint)controlSocket.LocalEndPoint).Port, latencySamples);
             Dictionary<string, object> request = new Dictionary<string, object>
             {
                 ["streams"] = new List<object> { stream }
             };
 
-            log("audio stream setup (buffer " + options.LatencyMs + " ms)");
+            log("audio stream SETUP " + (options.UseAlac ? "ALAC" : "PCM") + " " + options.SampleRate +
+                " Hz, ct " + Plist.Integer(stream, "ct") + ", spf " + AudioPacketizer.FramesPerPacket + ", asc " +
+                (packetizer.MagicCookie == null ? 0 : packetizer.MagicCookie.Length) + " bytes (buffer " + options.LatencyMs + " ms)");
             Dictionary<string, object> streamReply = Plist.AsDictionary(
                 Plist.Read(control.Send("SETUP", Uri, PlistHeaders(), Plist.Write(request)).Body));
             List<object> streams = Plist.AsList(streamReply["streams"]);
@@ -183,6 +178,10 @@ namespace AirStereo.Session
                 throw new ProtocolException("receiver did not return usable media ports");
             }
 
+            // SETUP has returned usable media ports. This describes the sender's actual
+            // packetizer, not a claim that the receiver has decoded audible audio.
+            log(CodecDiagnostics(options.UseAlac, packetizer.UseAlac, packetizer.Rate,
+                packetizer.MagicCookie == null ? 0 : packetizer.MagicCookie.Length));
             audioTarget = new IPEndPoint(address, (int)dataPort);
             timingTarget = new IPEndPoint(address, (int)remoteControlPort);
             audioSocket.Connect(audioTarget);
@@ -222,6 +221,43 @@ namespace AirStereo.Session
             };
             feedbackWorker.Start();
             activeSessions[receiver.Address] = this;
+        }
+
+        // Keep the wire declaration tied to the packetizer that produces media bytes.
+        // AirPlay 2 compression type is 1 for LPCM and 2 for ALAC.
+        internal static Dictionary<string, object> CreateAudioStreamDescription(
+            AudioPacketizer packetizer, byte[] audioKey, int controlPort, int latencySamples)
+        {
+            Dictionary<string, object> stream = new Dictionary<string, object>
+            {
+                ["audioFormat"] = (long)AudioPacketizer.AudioFormat(packetizer.UseAlac, packetizer.Rate),
+                ["audioMode"] = "default",
+                ["controlPort"] = (long)controlPort,
+                ["ct"] = packetizer.UseAlac ? 2L : 1L,
+                ["isMedia"] = true,
+                ["latencyMin"] = (long)latencySamples,
+                ["latencyMax"] = (long)latencySamples,
+                ["shk"] = audioKey,
+                ["spf"] = (long)AudioPacketizer.FramesPerPacket,
+                ["sr"] = (long)packetizer.Rate,
+                ["type"] = 96L,
+                ["supportsDynamicStreamID"] = false,
+                ["streamConnectionID"] = (long)packetizer.Ssrc
+            };
+            if (packetizer.UseAlac) stream["asc"] = packetizer.MagicCookie;
+            return stream;
+        }
+
+        internal static string CodecDiagnostics(bool requestedAlac, bool actualAlac, int rate, int ascBytes)
+        {
+            return "Codec diagnostics: requested=" + (requestedAlac ? "ALAC" : "PCM") +
+                " actual=" + (actualAlac ? "ALAC" : "PCM") +
+                " reason=" + (actualAlac ? "default-alac" : "experimental-pcm-override") +
+                " codec=" + (actualAlac ? "ALAC" : "PCM") + " sampleRate=" + rate +
+                " framesPerPacket=" + AudioPacketizer.FramesPerPacket +
+                " channels=" + AudioPacketizer.Channels + " bitsPerSample=16 ascBytes=" + ascBytes +
+                " ct=" + (actualAlac ? 2 : 1) +
+                " setup=accepted actualScope=sender receiverAudio=not-verified";
         }
 
         public static bool TrySetVolume(IList<Receiver> members, double decibels, Action<string> log)
@@ -404,7 +440,8 @@ namespace AirStereo.Session
             // The timing packet maps the timestamp the next audio block carries, so it is
             // emitted first and reads the packetizer before the block advances the timeline.
             if (sendTiming) SendTiming(nowNanoseconds, clockId, first);
-            SendAudio(packetizer.Packet(pcm, first));
+            AudioPacketizer.PacketBuffer packet = packetizer.Packet(pcm, first);
+            SendAudio(packet.Buffer, packet.Length);
         }
 
         /// <summary>Answers retransmission requests. Called on the sending thread.</summary>
@@ -427,11 +464,11 @@ namespace AirStereo.Session
             }
         }
 
-        private void SendAudio(byte[] packet)
+        private void SendAudio(byte[] packet, int length)
         {
             try
             {
-                audioSocket.Send(packet);
+                audioSocket.Send(packet, 0, length, SocketFlags.None);
                 ConsecutiveMediaSendFailures = 0;
             }
             catch (SocketException)

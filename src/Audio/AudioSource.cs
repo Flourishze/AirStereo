@@ -6,10 +6,25 @@ using AirStereo.Protocol;
 
 namespace AirStereo.Audio
 {
+    /// <summary>Capture-side confidence for the audio block most recently returned.</summary>
+    public enum AudioReadActivity
+    {
+        Unknown,
+        Active,
+        ConfirmedSilent,
+        Starved
+    }
+
     /// <summary>Interleaved 16 bit stereo audio, delivered in fixed frame blocks.</summary>
     public abstract class AudioSource
     {
         public abstract int SampleRate { get; }
+
+        /// <summary>True when the source follows a live desktop audio stream.</summary>
+        public virtual bool IsRealtime { get { return false; } }
+
+        /// <summary>Activity reported for the most recent read. Non-capture sources are active.</summary>
+        public virtual AudioReadActivity LastReadActivity { get { return AudioReadActivity.Active; } }
 
         /// <summary>Fills <paramref name="buffer"/> with interleaved stereo samples.</summary>
         public abstract int Read(short[] buffer, int frames);
@@ -19,6 +34,15 @@ namespace AirStereo.Audio
         /// A file or a tone has nothing to do here; a live capture uses it to settle its queue.
         /// </summary>
         public virtual void Prepare()
+        {
+        }
+
+        /// <summary>
+        /// Rebuilds a live capture pipeline before a paused stream is resumed. File and tone
+        /// sources do not need this; WASAPI loopback uses it to stop recording, clear stale PCM,
+        /// recreate the capture client and then restart.
+        /// </summary>
+        public virtual void PrepareForResume()
         {
         }
 
@@ -343,7 +367,7 @@ namespace AirStereo.Audio
     }
 
     /// <summary>Multiplies another source by a fixed gain, clamped to the 16 bit range.</summary>
-    public sealed class GainSource : AudioSource
+    public sealed class GainSource : AudioSource, IDisposable
     {
         private readonly AudioSource inner;
         private readonly double gain;
@@ -356,6 +380,13 @@ namespace AirStereo.Audio
         }
 
         public override int SampleRate { get { return inner.SampleRate; } }
+        public override bool IsRealtime { get { return inner.IsRealtime; } }
+        public override AudioReadActivity LastReadActivity { get { return inner.LastReadActivity; } }
+
+        public override void PrepareForResume()
+        {
+            inner.PrepareForResume();
+        }
 
         public override int Read(short[] buffer, int frames)
         {
@@ -374,5 +405,15 @@ namespace AirStereo.Audio
         {
             inner.Stop();
         }
+
+        public void Dispose()
+        {
+            (inner as IDisposable)?.Dispose();
+        }
     }
 }
+
+
+
+
+

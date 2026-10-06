@@ -1,8 +1,8 @@
 [CmdletBinding()]
 param(
-    [string]$PayloadDirectory = 'packages\release-1.0.4\payload',
-    [string]$OutputDirectory = 'packages\release-assets-1.0.4',
-    [string]$Version = '1.0.4',
+    [string]$PayloadDirectory = 'packages\release-1.0.5\payload',
+    [string]$OutputDirectory = 'packages\release-assets-1.0.5',
+    [string]$Version = '1.0.5',
     [string]$WixExe = 'packages\wix-tools\wix-4.0.6\tools\net6.0\any\wix.exe'
 )
 $ErrorActionPreference = 'Stop'
@@ -93,3 +93,6 @@ $hash = (Get-FileHash -LiteralPath $msi -Algorithm SHA256).Hash.ToLowerInvariant
 ($hash + '  ' + [IO.Path]::GetFileName($msi)) | Set-Content -LiteralPath (Join-Path $output "AirStereo-$Version-x64.msi.sha256") -Encoding ASCII
 Write-Output "msi=$msi"
 Write-Output "files=$index bytes=$((Get-Item -LiteralPath $msi).Length) sha256=$hash"
+
+
+

@@ -6,7 +6,7 @@
 	<img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200"/>
 </a>
 
-Windows x64 AirPlay audio sender. The current version is **1.0.4**. Source and standalone releases are published at [Flourishze/AirStereo](https://github.com/Flourishze/AirStereo). The Store edition is updated by Microsoft Store.
+Windows x64 AirPlay audio sender. The current version is **1.0.5**. Source and standalone releases are published at [Flourishze/AirStereo](https://github.com/Flourishze/AirStereo). The Store edition is updated by Microsoft Store.
 
 ## What Is AirStereo?
 
@@ -47,7 +47,7 @@ Offline preview of the actual interface: speaker names and addresses are demonst
 Use EXE for the installation wizard or MSI for deployment. Install the Store-signed edition from Microsoft Store; the unsigned MSIX asset is for Store submission. Do not run both editions simultaneously.
 
 
-Download `AirStereo-Setup-1.0.4-x64.exe` from the repository's Releases page. Exit an older version from the tray menu before installing. The installer includes the .NET Core and Windows Desktop 10.0.12 runtimes and prefers the runtimes in the installation directory. No separate .NET runtime installation is required; the operating system must still be a Windows x64 version supported by .NET 10.
+Download `AirStereo-Setup-1.0.5-x64.exe` from the repository's Releases page. Exit an older version from the tray menu before installing. The installer includes the .NET Core and Windows Desktop 10.0.12 runtimes and prefers the runtimes in the installation directory. No separate .NET runtime installation is required; the operating system must still be a Windows x64 version supported by .NET 10.
 
 1. Click the AirStereo tray icon in the lower-right corner, scan for speakers, and select the targets you want to use.
 2. Playback is disabled when nothing is selected. Selecting one independent speaker sends full stereo audio and disables the left/right balance control.
@@ -59,11 +59,15 @@ Actual compatibility depends on receiver firmware, access permissions, network c
 
 Wireless playback includes capture, network, and receiver-buffer delays. The configured latency is not a measurement of end-to-end latency. AirStereo does not promise zero latency and is not a replacement for low-latency gaming audio or real-time monitoring equipment.
 
-## What's New in 1.0.4
+## What's New in 1.0.5
 
-- Bounded capture/resampling buffers and discarded-log undo cleanup improve memory stability during extended use.
-- Restored click-outside dismissal of the tray panel on first launch.
-- Existing routing, EQ, channel tests and high-DPI layouts are retained.
+- Native ALAC is now the default media codec (44.1/48 kHz, stereo, 16-bit, 352 frames per packet). Diagnostics and the tray connection state expose the active codec parameters; `--pcm` remains an experimental fallback.
+- Media packets and the RTP timeline continue during source silence. The default `repeat-last` silence frame is used, and graceful disconnect occurs only after 90 minutes of continuously confirmed source silence. `--silence-mode=zero` is available for experiments.
+- Prevented capture starvation with no source audio from accumulating sender lateness and skipping media slots; filler blocks continue to be sent during starvation.
+- Added local-output muting while streaming, startup auto-connect, and diagnostic-log follow suspension after user scrolling with automatic recovery after 10 seconds of inactivity.
+- Existing routing, PTP, retransmission, EQ, channel tests and high-DPI layouts are retained.
+
+Offline SelfTest passed. HomePod hardware acceptance still requires user testing on the target devices and is not claimed by offline tests. The unresolved left-button drag issue on the diagnostic scrollbar is not claimed as fixed.
 
 ## Settings
 
@@ -82,7 +86,7 @@ For a bug report, include the AirStereo version, Windows version, display scalin
 
 ## Build and Documentation
 
-See the [build guide](docs/BUILD.md), [acceptance checklist](docs/TESTING.md), [changelog](CHANGELOG.md), and [1.0.4 release notes](docs/releases/v1.0.4.md). The repository includes the application source and packaging scripts. The original source for the existing installer wizard is not included, so packaging still depends on the explicitly documented binary template.
+See the [build guide](docs/BUILD.md), [acceptance checklist](docs/TESTING.md), [changelog](CHANGELOG.md), and [1.0.5 release notes](docs/releases/v1.0.5.md). The repository includes the application source and packaging scripts. The original source for the existing installer wizard is not included, so packaging still depends on the explicitly documented binary template.
 
 ## License
 
@@ -91,3 +95,5 @@ AirStereo's own code and documentation are licensed under the [MIT License](LICE
 Third-party code, dependencies, the .NET runtime, and installer binary templates remain subject to their respective licenses; this repository's MIT License does not change those terms. The .NET runtime distributed with the installer retains its original `LICENSE` and `ThirdPartyNotices` files.
 
 AirStereo is an independent project and is not an official Apple application. AirPlay, HomePod, and other trademarks belong to their respective owners.
+
+

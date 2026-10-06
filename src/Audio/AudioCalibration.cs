@@ -123,7 +123,7 @@ namespace AirStereo.Audio
     /// allocation-free path as the packetizer and only rebuilds coefficients when the
     /// immutable profile object changes.
     /// </summary>
-    public sealed class CalibratedAudioSource : AudioSource
+    public sealed class CalibratedAudioSource : AudioSource, IDisposable
     {
         private readonly AudioSource inner;
         private readonly AudioProfileController controller;
@@ -148,6 +148,13 @@ namespace AirStereo.Audio
         }
 
         public override int SampleRate { get { return inner.SampleRate; } }
+
+        public override bool IsRealtime { get { return inner.IsRealtime; } }
+
+        public override AudioReadActivity LastReadActivity
+        {
+            get { return inner.LastReadActivity; }
+        }
 
         public override int Read(short[] buffer, int frames)
         {
@@ -179,6 +186,16 @@ namespace AirStereo.Audio
             inner.Prepare();
         }
 
+        public override void PrepareForResume()
+        {
+            inner.PrepareForResume();
+            for (int band = 0; band < leftState.Length; band++)
+            {
+                leftState[band].Reset();
+                rightState[band].Reset();
+            }
+        }
+
         public override void Stop()
         {
             inner.Stop();
@@ -187,6 +204,12 @@ namespace AirStereo.Audio
         public override string Stats()
         {
             return inner.Stats();
+        }
+
+        public void Dispose()
+        {
+            IDisposable disposable = inner as IDisposable;
+            if (disposable != null) disposable.Dispose();
         }
 
         private void ApplyProfile(AudioProfile profile)

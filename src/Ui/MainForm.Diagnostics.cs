@@ -27,6 +27,7 @@ namespace AirStereo.Ui
                 HorizontalScroll = { Enabled = false } };
             BufferedTableLayoutPanel grid = Grid(1);
             settingsGeneralGrid = grid;
+            grid.Dock = DockStyle.Top;
             grid.BackColor = CanvasColor;
             grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             grid.RowCount = 5;
@@ -58,6 +59,7 @@ namespace AirStereo.Ui
                 "MSIX 版由 Microsoft Store 管理更新" : "更新来源：Flourishze/AirStereo 正式 Release", Dock = DockStyle.Fill,
                 ForeColor = MutedColor, AutoEllipsis = true };
             grid.Controls.Add(updateStatus, 0, 3);
+            grid.Controls.Add(BuildAutoConnectOptions(), 0, 4);
             page.Controls.Add(grid);
             return page;
         }
