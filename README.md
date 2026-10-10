@@ -58,7 +58,7 @@ Windows x64 AirPlay 音频发送应用。当前版本 **1.0.6**，源码与独�
 EXE 提供安装向导，MSI 适合部署。商店版请使用上方 Microsoft Store 入口，由商店负责签名与更新；MSIX 提交包由维护者单独管理，不作为未签名的日常安装下载。请勿同时运行商店版与独立安装版。
 
 
-从本仓库 Releases 下载 `AirStereo-Setup-1.0.6-x64.exe`，安装前从托盘菜单退出旧版。安装包附带 .NET Core 与 Windows Desktop 10.0.12 运行时，优先使用安装目录内的运行时。无需另装 .NET 运行时；仍需要受 .NET 10 支持的 Windows x64 系统。
+从本仓库 Releases 下载 `AirStereo-Setup-1.0.6-x64-r2.exe`，安装前从托盘菜单退出旧版。安装包附带 .NET Core 与 Windows Desktop 10.0.12 运行时，优先使用安装目录内的运行时。无需另装 .NET 运行时；仍需要受 .NET 10 支持的 Windows x64 系统。
 
 1. 点击右下角 AirStereo 托盘图标，扫描并勾选音响。
 2. 未选择时不能播放；选择一只独立音响时发送完整立体声，并禁用左右平衡。

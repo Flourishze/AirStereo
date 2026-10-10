@@ -58,7 +58,7 @@ Offline preview of the actual interface: speaker names and addresses are demonst
 Use EXE for the installation wizard or MSI for deployment. Install the Store-signed edition from Microsoft Store; MSIX submission packages are managed separately by the maintainer, not offered as unsigned end-user installers. Do not run both editions simultaneously.
 
 
-Download `AirStereo-Setup-1.0.6-x64.exe` from the repository's Releases page. Exit an older version from the tray menu before installing. The installer includes the .NET Core and Windows Desktop 10.0.12 runtimes and prefers the runtimes in the installation directory. No separate .NET runtime installation is required; the operating system must still be a Windows x64 version supported by .NET 10.
+Download `AirStereo-Setup-1.0.6-x64-r2.exe` from the repository's Releases page. Exit an older version from the tray menu before installing. The installer includes the .NET Core and Windows Desktop 10.0.12 runtimes and prefers the runtimes in the installation directory. No separate .NET runtime installation is required; the operating system must still be a Windows x64 version supported by .NET 10.
 
 1. Click the AirStereo tray icon in the lower-right corner, scan for speakers, and select the targets you want to use.
 2. Playback is disabled when nothing is selected. Selecting one independent speaker sends full stereo audio and disables the left/right balance control.

@@ -62,6 +62,7 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 $cecil = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\18\BuildTools\Common7\IDE\Extensions\TestPlatform\Extensions\Mono.Cecil.dll'
 Add-Type -Path $cecil
 . (Join-Path $PSScriptRoot 'patch-installer.ps1')
+. (Join-Path $PSScriptRoot 'icon-installer.ps1')
 $baseInstaller = WorkspacePath $BaseInstaller
 $assembly = [Mono.Cecil.AssemblyDefinition]::ReadAssembly($baseInstaller)
 try {
@@ -140,10 +141,12 @@ try {
         Add-PreviousInstallPathSupport -Assembly $assembly
     }
     $assembly.Name.Version = [version]($BuildId + '.0')
+    Set-InstallerWindowIcon -Assembly $assembly
     $assembly.Write($installer)
 } finally { $assembly.Dispose() }
 . (Join-Path $PSScriptRoot 'version-installer.ps1')
 Set-InstallerFileVersion -Installer $installer -Application (Join-Path $payload 'AirStereo.exe') -Version $BuildId
+Set-InstallerFileIcon -Installer $installer -IconPath (Join-Path $root 'assets/icons/AirStereo.ico')
 $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash
 ($hash + '  AirStereo-Setup.exe') | Set-Content -LiteralPath (Join-Path $output 'AirStereo-Setup.exe.sha256') -Encoding ASCII
 $metadata = [ordered]@{
