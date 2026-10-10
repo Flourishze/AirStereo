@@ -23,16 +23,25 @@ It is an audio sender, not a music player, and it does not connect over Bluetoot
 
 ### Main Features
 
-| Feature | Description |
+| Feature | Current behavior |
 | --- | --- |
-| Wireless PC audio | Capture Windows system playback audio and send it to compatible speakers |
-| Speaker checklist | Discover targets and choose single- or two-device playback automatically from the selection |
-| Left/right output | Two independent speakers share a media timeline and PTP clock, with L / R assigned in selection order |
-| Native stereo pairs | Explicitly identified pairs appear as one target, preventing duplicate selection of their members |
-| Audio settings | Equalizer, volume, channel test tones, balance with a center reset, and latency settings |
-| System-tray control | A compact tray interface with optional launch at startup |
-| Troubleshooting | View connection faults and runtime logs, and open the local Diagnostics folder |
-| Version checks | Manually check stable releases in this repository and open the Release page for updates |
+| Wireless Windows audio | Capture the system mix from the default output device and send it to compatible AirPlay speakers over the local network |
+| Speaker list and checkboxes | Automatic discovery and manual refresh with selectable targets; no single/dual-device mode switch is required |
+| Full stereo on one speaker | Select one independent speaker for full stereo; left/right balance is disabled for this route |
+| L/R on two independent speakers | Select up to two speakers in order to assign L/R on one media timeline and PTP clock; either device disconnecting stops the two-device session |
+| Native Apple stereo pairs | Explicitly identified pairs appear as one logical target; full stereo is sent and the receivers assign physical channels |
+| Manual or real-time volume | By default, drag and click ✓ to apply; enable real-time adjustment to apply while dragging without a second confirmation |
+| Five-band EQ and balance | Five-band equalizer, left/right balance and one-click centering, available during playback with EQ bypass |
+| Left/right channel tests | Test tones temporarily bypass the current balance and restore it afterward |
+| Latency setting | Set the target buffer delay while stopped; it applies to the next session and is not a measured end-to-end delay |
+| Light, dark or system appearance | Saved, immediate theme changes with settings cards, native dropdowns, lightweight transitions, and large-text/high-DPI layouts |
+| Quick tray controls | Open speaker, playback and volume controls from the tray; transparent icons adapt to the Windows taskbar color |
+| Startup and auto-connect | Optional launch-to-tray at Windows sign-in and selected-target auto-connect; both are off by default |
+| Mute local output while streaming | Optionally mute PC output during wireless playback and restore the prior mute state when playback stops; off by default |
+| Fault records and diagnostic logs | View connection/playback failures and open the Diagnostics folder directly; an empty scan is a status message, not a fault |
+| Edition-aware update checks | Standalone builds check stable Releases in this repository; the Store edition is updated by Microsoft Store |
+
+ALAC lossless encoding is the default, with active audio parameters available in diagnostics. PCM remains an experimental command-line fallback, not a codec dropdown in Settings.
 
 [Download](https://github.com/Flourishze/AirStereo/releases) · [Report a Problem / Request a Feature](https://github.com/Flourishze/AirStereo/issues) · [Changelog](CHANGELOG.md)
 
