@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -28,7 +28,7 @@ namespace AirStereo.Ui
 
         private Control BuildMuteLocalOutput()
         {
-            muteLocalOutputBox = new CheckBox { Text = "串流时静音本机输出", Dock = DockStyle.Fill,
+            muteLocalOutputBox = new SettingsSwitch { Text = "串流时静音本机输出", Dock = DockStyle.Fill,
                 ForeColor = InkColor, AutoEllipsis = true, AccessibleName = "串流时静音本机输出（默认关闭）" };
             muteLocalOutputBox.CheckedChanged += delegate
             {
@@ -42,7 +42,7 @@ namespace AirStereo.Ui
         private Control BuildAutoConnectOptions()
         {
             var panel = new Panel { Dock = DockStyle.Fill, BackColor = CanvasColor };
-            autoConnectBox = new CheckBox { Text = "启动时自动连接下列音响", Dock = DockStyle.Top,
+            autoConnectBox = new SettingsSwitch { Text = "启动时自动连接下列音响", Dock = DockStyle.Top,
                 Height = 38, ForeColor = InkColor, AutoEllipsis = true,
                 AccessibleName = "启动时自动连接（默认关闭）" };
             autoConnectDeviceList = new CheckedListBox { Dock = DockStyle.Fill, CheckOnClick = true,
@@ -110,6 +110,8 @@ namespace AirStereo.Ui
                     autoConnectDeviceList.Items.Add(new AutoConnectDevice { Identity = pair.Key, Name = pair.Value.Instance }, false);
             }
             finally { autoConnectDeviceList.EndUpdate(); autoDeviceListSyncing = false; }
+            if (settingsForm != null)
+                LayoutGeneralCards(Math.Max(96, settingsForm.DeviceDpi), Math.Max(16, settingsForm.Font.Height));
         }
         private void InitializeStartupFeatures()
         {

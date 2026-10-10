@@ -1,8 +1,8 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
-    [string]$PayloadDirectory = 'packages\release-1.0.5\payload',
-    [string]$OutputDirectory = 'packages\release-assets-1.0.5',
-    [string]$Version = '1.0.5',
+    [string]$PayloadDirectory = 'packages\release-1.0.6\payload',
+    [string]$OutputDirectory = 'packages\release-assets-1.0.6',
+    [string]$Version = '1.0.6',
     [string]$WixExe = 'packages\wix-tools\wix-4.0.6\tools\net6.0\any\wix.exe'
 )
 $ErrorActionPreference = 'Stop'

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -87,6 +87,7 @@ namespace AirStereo.Ui
 
             BufferedTableLayoutPanel volume = Grid(4);
             compactVolume = volume;
+            volume.Card = true;
             volume.Padding = new Padding(8, 8, 6, 8);
             volume.Margin = new Padding(0, 4, 0, 4);
             volume.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 48));
@@ -100,12 +101,13 @@ namespace AirStereo.Ui
                 Margin = new Padding(0), AccessibleName = "会话音量" };
             volumeValue = new Label { Text = "65%", Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.MiddleCenter, ForeColor = InkColor, AutoEllipsis = true };
-            volumeBar.ValueChanged += delegate { volumeValue.Text = volumeBar.Value + "%"; };
+            volumeBar.ValueChanged += OnVolumeValueChanged;
             volumeButton = CompactIcon("应用音量到当前所选音响", Glyph.Check);
             volumeButton.Click += delegate { ApplyVolume(); };
             volume.Controls.Add(volumeBar, 1, 0);
             volume.Controls.Add(volumeValue, 2, 0);
             volume.Controls.Add(volumeButton, 3, 0);
+            InitializeVolumeAdjustment(volume);
             root.Controls.Add(volume, 0, 4);
 
             BufferedTableLayoutPanel footer = Grid(1);
@@ -140,7 +142,7 @@ namespace AirStereo.Ui
             int header = Math.Max(UiPixels(44), text + UiPixels(16));
             int detail = Math.Max(UiPixels(32), text + UiPixels(10));
             int action = Math.Max(UiPixels(40), text + UiPixels(12));
-            int volume = Math.Max(UiPixels(56), text + UiPixels(22));
+            int volume = Math.Max(UiPixels(84), text * 2 + UiPixels(38));
             int footer = Math.Max(UiPixels(48), text * 2 + UiPixels(12));
 
             compactRoot.RowStyles.Clear();
@@ -159,6 +161,9 @@ namespace AirStereo.Ui
             compactActions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             compactActions.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UiPixels(44)));
             compactVolume.Padding = new Padding(UiPixels(8), UiPixels(8), UiPixels(6), UiPixels(8));
+            compactVolume.RowStyles.Clear();
+            compactVolume.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            compactVolume.RowStyles.Add(new RowStyle(SizeType.Absolute, Math.Max(UiPixels(26), text + UiPixels(6))));
             compactVolume.ColumnStyles.Clear();
             compactVolume.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UiPixels(48)));
             compactVolume.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -201,7 +206,7 @@ namespace AirStereo.Ui
                 // left only a narrow strip for each table column after 175%/200%
                 // font scaling, so labels and buttons were compressed into each
                 // other even though the controls themselves were technically docked.
-                ClientSize = new Size(640, 580), MinimumSize = new Size(560, 440),
+                ClientSize = new Size(980, 720), MinimumSize = new Size(560, 440),
                 ShowInTaskbar = false, MaximizeBox = false, MinimizeBox = false,
                 StartPosition = FormStartPosition.CenterScreen };
             // Keep the unscaled reference.  The offline DPI harness and Windows
@@ -243,6 +248,7 @@ namespace AirStereo.Ui
             options.Controls.Add(settingsRouteBox, 0, 0);
             options.Controls.Add(BuildSettingsLatency(), 0, 1);
             BufferedTableLayoutPanel commands = Grid(2);
+            commands.Margin = new Padding(0);
             commands.BackColor = CanvasColor;
             commands.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
             commands.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
@@ -255,7 +261,7 @@ namespace AirStereo.Ui
             commands.Controls.Add(patternButton, 0, 0);
             commands.Controls.Add(calibrationButton, 1, 0);
             options.Controls.Add(commands, 0, 2);
-            options.Controls.Add(BuildMuteLocalOutput(), 0, 3);
+            options.Controls.Add(new SettingsCard(BuildMuteLocalOutput()), 0, 3);
             settingsAudioPage = audio;
             audio.Controls.Add(options);
             logs.Controls.Add(BuildLogBox());
@@ -265,6 +271,7 @@ namespace AirStereo.Ui
             tabs.AddPage("常规", settingsGeneralPage);
             tabs.AddPage("故障记录", settingsFaultPage);
             tabs.AddPage("诊断日志", logs);
+            tabs.AddShortcut("均衡器", OpenCalibration);
             tabs.SelectedIndexChanged += delegate { ResetSettingsPageScroll(tabs); };
             ((DarkSettingsForm)settingsForm).ContentHost.Controls.Add(tabs);
             ApplySettingsLayout(false);
@@ -311,8 +318,12 @@ namespace AirStereo.Ui
             // hint row ended 8–16px below its parent after WinForms scaled the
             // form, which is exactly the clipped 175%/200% symptom.
             int latencyHeight = modeRow * 3 + sliderRow + valueRow + hintRow + 88;
-            int commandHeight = Math.Max(DpiPixels(56), text + DpiPixels(26));
-            int muteHeight = Math.Max(DpiPixels(40), text + DpiPixels(16));
+            int commandHeight = Math.Max(DpiPixels(52), text + DpiPixels(26));
+            // The buttons share one grid, with equal half-gutters and no outside
+            // margins. Their outer edges now line up with the adjacent cards.
+            patternButton.Margin = new Padding(0, 0, DpiPixels(4), DpiPixels(8));
+            calibrationButton.Margin = new Padding(DpiPixels(4), 0, 0, DpiPixels(8));
+            int muteHeight = Math.Max(DpiPixels(86), text + DpiPixels(56));
 
             settingsOptions.Height = routeHeight + latencyHeight + commandHeight + muteHeight + 8;
             settingsOptions.RowStyles.Clear();
@@ -373,16 +384,7 @@ namespace AirStereo.Ui
                 settingsOptions.RowStyles[0].Height = routeHeight;
             }
             settingsOptions.Height = routeHeight + latencyMinimum + commandHeight + muteHeight + 8;
-            settingsGeneralGrid?.RowStyles.Clear();
-            if (settingsGeneralGrid != null)
-            {
-                for (int i = 0; i < 4; i++) settingsGeneralGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, Math.Max(DpiPixels(44), text + DpiPixels(20))));
-                settingsGeneralGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-                if (autoConnectBox != null) autoConnectBox.Height = Math.Max(DpiPixels(38), text + DpiPixels(16));
-                if (autoConnectHint != null) autoConnectHint.Height = Math.Max(DpiPixels(38), text + DpiPixels(16));
-                int autoHeight = (autoConnectBox?.Height ?? 38) + (autoConnectHint?.Height ?? 38) + Math.Max(DpiPixels(110), text * 4);
-                settingsGeneralGrid.Height = 4 * Math.Max(DpiPixels(44), text + DpiPixels(20)) + autoHeight + DpiPixels(12);
-            }
+            LayoutGeneralCards(dpi, text);
             if (settingsFaultGrid != null)
             {
                 settingsFaultGrid.RowStyles.Clear();
@@ -525,9 +527,11 @@ namespace AirStereo.Ui
         private static string CompactTargetDetail(ReceiverGroup group)
         {
             if (group.IsStereoPair) return "原生立体声对 · 2 只";
-            if (group.IsIncompleteGroup) return group.StereoPairId.Length > 0
-                ? "原生配对 · 成员不完整" : "疑似配对 · 信息不完整";
             string address = group.Leader?.Address ?? "";
+            if (PlaybackRoute.Independent(group)) return "独立音响" +
+                (address.Length > 0 ? " · " + address : "");
+            if (group.IsIncompleteGroup && group.StereoPairId.Length > 0)
+                return "配对音响" + (address.Length > 0 ? " · " + address : "");
             return (group.IsSuspectedPair ? "独立音响 · 疑似配对" : "独立音响") +
                 (address.Length > 0 ? " · " + address : "");
         }
@@ -536,7 +540,7 @@ namespace AirStereo.Ui
         {
             Rectangle work = Screen.FromPoint(Cursor.Position).WorkingArea;
             int rows = Math.Max(1, Math.Min(4, deviceRows.Count));
-            int height = UiPixels(254) + rows * Math.Max(UiPixels(88), Font.Height * 4 + UiPixels(12));
+            int height = UiPixels(284) + rows * Math.Max(UiPixels(88), Font.Height * 4 + UiPixels(12));
             int width = Math.Max(UiPixels(410), MinimumSize.Width);
             int availableHeight = Math.Max(UiPixels(340), work.Height - UiPixels(16));
             ClientSize = new Size(width, Math.Min(height, availableHeight));
@@ -577,6 +581,7 @@ namespace AirStereo.Ui
         protected override void OnDpiChanged(DpiChangedEventArgs args)
         {
             base.OnDpiChanged(args);
+            UpdateNotificationIcon();
             Post(delegate { ApplyCompactLayout(); ApplySettingsLayout(true); RebuildDeviceList(); PositionPopup(); });
         }
 
@@ -604,6 +609,7 @@ namespace AirStereo.Ui
                 // Explorer may miss the first Shell_NotifyIcon call during login or
                 // after Explorer restarts. Re-registering the already-configured icon
                 // is safe and makes the tray entry deterministic.
+                UpdateNotificationIcon();
                 trayIcon.Visible = false;
                 trayIcon.Visible = true;
             }

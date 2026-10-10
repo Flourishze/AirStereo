@@ -226,6 +226,10 @@ namespace AirStereo.Ui
                 Call(form, "InitializeStartupFeatures"); Call(form, "BeginScan"); Call(form, "StartPlayback", "loopback");
                 check("UI offline startup/scan/play leaves audio and discovery idle", !(bool)Field(form, "playing") && !(bool)Field(form, "scanning") && Field(form, "autoConnectTimer") == null, null);
                 IntPtr handle = form.Handle;
+                var logSettings = (DarkSettingsForm)Field(form, "settingsForm");
+                ((SettingsTabs)logSettings.ContentHost.Controls[0]).SelectedIndex = 3;
+                logSettings.Opacity = 0;
+                logSettings.Show();
                 var log = (TextBox)Field(form, "logBox");
                 IntPtr logHandle = log.Handle;
                 var follow = (LogFollowState)Field(form, "logFollow");
@@ -248,7 +252,8 @@ namespace AirStereo.Ui
                 SendMessage(logHandle, 0x0207, (IntPtr)0x10, (IntPtr)(100 << 16));
                 int beforePan = (int)SendMessage(logHandle, 0x00CE, IntPtr.Zero, IntPtr.Zero);
                 SendMessage(logHandle, 0x0200, (IntPtr)0x10, (IntPtr)(20 << 16));
-                check("UI middle-button sliding pauses AND moves viewport", follow.Paused && (int)SendMessage(logHandle, 0x00CE, IntPtr.Zero, IntPtr.Zero) > beforePan, null);
+                check("UI middle-button sliding pauses AND moves viewport", follow.Paused && (int)SendMessage(logHandle, 0x00CE, IntPtr.Zero, IntPtr.Zero) > beforePan,
+                    "before=" + beforePan + "; after=" + (int)SendMessage(logHandle, 0x00CE, IntPtr.Zero, IntPtr.Zero));
                 SendMessage(logHandle, 0x0208, IntPtr.Zero, IntPtr.Zero);
                 check("UI middle release ends grab", !(bool)Field(form, "middleLogScroll") && !log.Capture, null);
                 // A vertical scrollbar drag starts with WM_NCLBUTTONDOWN. The

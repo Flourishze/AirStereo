@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Globalization;
 using System.Windows.Forms;
@@ -13,20 +13,23 @@ namespace AirStereo.Ui
     /// </summary>
     internal sealed class CalibrationForm : DarkSettingsForm
     {
-        private static readonly Color Canvas = DesktopTheme.Canvas;
-        private static readonly Color Ink = DesktopTheme.Ink;
-        private static readonly Color Muted = DesktopTheme.Muted;
-        private static readonly Color AccentDark = DesktopTheme.Accent;
-        private static readonly Color Border = DesktopTheme.Border;
+        private static Color Canvas => DesktopTheme.Canvas;
+        private static Color Ink => DesktopTheme.Ink;
+        private static Color Muted => DesktopTheme.Muted;
+        private static Color AccentDark => DesktopTheme.Accent;
+        private static Color Border => DesktopTheme.Border;
 
         private readonly AudioProfileController controller;
         private readonly Action<AudioProfile> changed;
         private readonly CheckBox enabledBox;
-        private readonly TrackBar[] bands;
+        private readonly ValueSlider[] bands;
         private readonly Label[] bandValues;
-        private readonly TrackBar balanceBar;
+        private readonly ValueSlider balanceBar;
         private readonly Label balanceValue;
         private readonly Label summary;
+        private TableLayoutPanel contentLayout, bandLayout, balanceLayout;
+        private Label eqFootnote;
+        private Font emphasisFont;
 
         public CalibrationForm(AudioProfileController controller, AudioProfile initial,
             Action<AudioProfile> changed)
@@ -35,8 +38,8 @@ namespace AirStereo.Ui
             this.changed = changed;
             Text = "AirStereo · 均衡器与左右平衡";
             Font = new Font("Microsoft YaHei UI", 9F);
-            AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(660, 468);
+            AutoScaleMode = AutoScaleMode.None;
+            ClientSize = new Size(660, 540);
             MinimumSize = new Size(620, 430);
             StartPosition = FormStartPosition.CenterParent;
             BackColor = Canvas;
@@ -46,7 +49,9 @@ namespace AirStereo.Ui
             ShowIcon = false;
 
             TableLayoutPanel root = new TableLayoutPanel();
-            root.Dock = DockStyle.Fill;
+            contentLayout = root;
+            root.Dock = DockStyle.Top;
+            ContentHost.AutoScroll = true;
             root.Padding = new Padding(18, 14, 18, 12);
             root.ColumnCount = 1;
             root.RowCount = 4;
@@ -55,25 +60,27 @@ namespace AirStereo.Ui
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 100F));
             root.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
-            enabledBox = new CheckBox();
+            enabledBox = new FluentCheckBox();
             enabledBox.Text = "启用均衡器与左右校准";
             enabledBox.Checked = initial.Enabled;
             enabledBox.ForeColor = Ink;
             enabledBox.AutoSize = true;
-            enabledBox.Font = new Font(Font, FontStyle.Bold);
             enabledBox.CheckedChanged += delegate { Publish(); };
 
             Label enableHint = new Label();
             enableHint.Text = "关闭后完全旁路，音频不经过 DSP";
             enableHint.ForeColor = Muted;
             enableHint.AutoSize = true;
-            enableHint.Location = new Point(230, 2);
 
-            Panel header = new Panel();
-            header.Dock = DockStyle.Fill;
-            header.Resize += delegate { enableHint.Left = Math.Max(enabledBox.Right + 18, 230); };
-            header.Controls.Add(enabledBox);
-            header.Controls.Add(enableHint);
+
+            TableLayoutPanel header = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2, ColumnCount = 1 };
+            header.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+            header.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+            enabledBox.Dock = DockStyle.Fill;
+            enableHint.Dock = DockStyle.Fill;
+            enableHint.TextAlign = ContentAlignment.MiddleLeft;
+            header.Controls.Add(enabledBox, 0, 0);
+            header.Controls.Add(enableHint, 0, 1);
 
             Panel eq = new Panel();
             eq.Dock = DockStyle.Fill;
@@ -88,6 +95,7 @@ namespace AirStereo.Ui
             };
 
             TableLayoutPanel bandsTable = new TableLayoutPanel();
+            bandLayout = bandsTable;
             bandsTable.Dock = DockStyle.Fill;
             bandsTable.ColumnCount = AudioProfile.BandCount;
             bandsTable.RowCount = 3;
@@ -101,7 +109,7 @@ namespace AirStereo.Ui
                 bandsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F / AudioProfile.BandCount));
             }
 
-            bands = new TrackBar[AudioProfile.BandCount];
+            bands = new ValueSlider[AudioProfile.BandCount];
             bandValues = new Label[AudioProfile.BandCount];
             string[] captions = { "60 Hz", "230 Hz", "910 Hz", "3.6 kHz", "12 kHz" };
             for (int i = 0; i < bands.Length; i++)
@@ -116,10 +124,9 @@ namespace AirStereo.Ui
                 bandValues[i] = new Label();
                 bandValues[i].TextAlign = ContentAlignment.MiddleCenter;
                 bandValues[i].ForeColor = AccentDark;
-                bandValues[i].Font = new Font(Font, FontStyle.Bold);
                 bandValues[i].Dock = DockStyle.Fill;
 
-                TrackBar bar = new TrackBar();
+                ValueSlider bar = new ValueSlider();
                 bar.Minimum = -12;
                 bar.Maximum = 12;
                 bar.TickFrequency = 3;
@@ -129,6 +136,7 @@ namespace AirStereo.Ui
                 bar.Dock = DockStyle.Fill;
                 bar.Margin = new Padding(4, 0, 4, 0);
                 bar.Value = (int)Math.Round(initial.BandGainDb(i));
+                bar.AccessibleName = captions[i] + " 增益（分贝）";
                 bar.ValueChanged += delegate { Publish(); };
                 bands[i] = bar;
 
@@ -138,6 +146,7 @@ namespace AirStereo.Ui
             }
 
             Label eqNote = new Label();
+            eqFootnote = eqNote;
             eqNote.Text = "五段峰值均衡器 · 每段 ±12 dB · 调整即时生效";
             eqNote.ForeColor = Muted;
             eqNote.TextAlign = ContentAlignment.MiddleCenter;
@@ -146,26 +155,29 @@ namespace AirStereo.Ui
             eq.Controls.Add(bandsTable);
             eq.Controls.Add(eqNote);
 
-            Panel balance = new Panel();
-            balance.Dock = DockStyle.Fill;
-            balance.Padding = new Padding(4, 4, 4, 0);
-            balance.BackColor = DesktopTheme.Surface;
+            TableLayoutPanel balance = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2,
+                Padding = new Padding(10, 6, 10, 6), BackColor = DesktopTheme.Surface };
+            balanceLayout = balance;
+            balance.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            balance.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 200));
+            balance.RowStyles.Add(new RowStyle(SizeType.Percent, 55));
+            balance.RowStyles.Add(new RowStyle(SizeType.Percent, 45));
 
             Label balanceCaption = new Label();
             balanceCaption.Text = "左右平衡：左侧偏小则向右，右侧偏小则向左；只衰减偏大的一侧";
             balanceCaption.ForeColor = Muted;
-            balanceCaption.Dock = DockStyle.Top;
+            balanceCaption.Dock = DockStyle.Fill;
             balanceCaption.Height = 22;
-            balance.Controls.Add(balanceCaption);
+            balance.Controls.Add(balanceCaption, 0, 0);
+            balance.SetColumnSpan(balanceCaption, 2);
 
             balanceValue = new Label();
-            balanceValue.Dock = DockStyle.Right;
+            balanceValue.Dock = DockStyle.Fill;
             balanceValue.Width = 86;
             balanceValue.TextAlign = ContentAlignment.MiddleCenter;
             balanceValue.ForeColor = AccentDark;
-            balanceValue.Font = new Font(Font, FontStyle.Bold);
 
-            balanceBar = new TrackBar();
+            balanceBar = new ValueSlider();
             balanceBar.Minimum = -12;
             balanceBar.Maximum = 12;
             balanceBar.TickFrequency = 2;
@@ -173,9 +185,10 @@ namespace AirStereo.Ui
             balanceBar.LargeChange = 2;
             balanceBar.Dock = DockStyle.Fill;
             balanceBar.Value = (int)Math.Round(initial.RightGainDb - initial.LeftGainDb);
+            balanceBar.AccessibleName = "均衡器左右校准（分贝）";
             balanceBar.ValueChanged += delegate { Publish(); };
-            balance.Controls.Add(balanceBar);
-            balance.Controls.Add(balanceValue);
+            balance.Controls.Add(balanceBar, 0, 1);
+            balance.Controls.Add(balanceValue, 1, 1);
 
             summary = new Label();
             summary.Dock = DockStyle.Fill;
@@ -188,7 +201,51 @@ namespace AirStereo.Ui
             root.Controls.Add(balance, 0, 2);
             root.Controls.Add(summary, 0, 3);
             ContentHost.Controls.Add(root);
+            ApplyAppearanceLayout();
+            Shown += delegate { ApplyAppearanceLayout(); };
             ShowValues(initial);
+        }
+
+        private void ApplyAppearanceLayout()
+        {
+            if (contentLayout == null || bandLayout == null || balanceLayout == null || eqFootnote == null) return;
+            int dpi = Math.Max(96, DeviceDpi);
+            int P(int logical) => Math.Max(1, (int)Math.Round(logical * dpi / 96.0));
+            int text = Math.Max(Font.Height, P(16));
+            if (emphasisFont == null || emphasisFont.Size != Font.Size || emphasisFont.FontFamily.Name != Font.FontFamily.Name)
+            {
+                Font previous = emphasisFont;
+                emphasisFont = new Font(Font, FontStyle.Bold);
+                enabledBox.Font = emphasisFont;
+                balanceValue.Font = emphasisFont;
+                foreach (Label label in bandValues) label.Font = emphasisFont;
+                previous?.Dispose();
+            }
+            contentLayout.Padding = new Padding(P(18), P(12), P(18), P(12));
+            int[] heights = { text * 2 + P(18), Math.Max(P(210), text * 6 + P(90)),
+                text * 3 + P(54), text * 3 + P(16) };
+            contentLayout.RowStyles.Clear();
+            foreach (int height in heights) contentLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
+            contentLayout.Height = heights[0] + heights[1] + heights[2] + heights[3] + contentLayout.Padding.Vertical;
+            bandLayout.RowStyles[0].Height = text + P(6);
+            bandLayout.RowStyles[1].Height = text + P(6);
+            eqFootnote.Height = text + P(8);
+            balanceLayout.ColumnStyles[1].Width = Math.Max(P(190), text * 11);
+            Rectangle work = Screen.FromControl(this).WorkingArea;
+            MinimumSize = new Size(Math.Min(P(620), Math.Max(320, work.Width - P(24))),
+                Math.Min(P(430), Math.Max(300, work.Height - P(24))));
+            contentLayout.PerformLayout();
+        }
+
+        protected override void OnFontChanged(EventArgs args)
+        { base.OnFontChanged(args); ApplyAppearanceLayout(); }
+        protected override void OnDpiChanged(DpiChangedEventArgs args)
+        { base.OnDpiChanged(args); ApplyAppearanceLayout(); }
+
+        protected override void Dispose(bool disposing)
+        {
+            base.Dispose(disposing);
+            if (disposing) { emphasisFont?.Dispose(); emphasisFont = null; }
         }
 
         private void Publish()

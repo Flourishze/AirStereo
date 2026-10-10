@@ -15,7 +15,7 @@ using AirStereo.Audio;
 namespace AirStereo.Ui
 {
     /// <summary>Offline UI events with synthetic receivers. Never scans or opens an audio session.</summary>
-    internal static class UiRegressionTests
+    internal static partial class UiRegressionTests
     {
         private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
         private static object Field(object owner, string name)
@@ -57,7 +57,7 @@ namespace AirStereo.Ui
             Exception failure = null;
             Thread thread = new Thread(() =>
             {
-                try { FeatureRegressionTests.VerifyUi(check); Verify(check); }
+                try { FeatureRegressionTests.VerifyUi(check); Verify(check); VerifyAppearance(check); VerifySettingsCards(check); VolumeRegressionTests.Verify(check); }
                 catch (Exception error) { failure = error; }
             });
             thread.SetApartmentState(ApartmentState.STA);
@@ -68,16 +68,59 @@ namespace AirStereo.Ui
 
         private static void Verify(Action<string, bool, string> check)
         {
-            // Exercise the first-launch path without showing a window, loading user
-            // settings, scanning receivers, or starting audio. No prior tray action
-            // should be required before a loss of focus schedules dismissal.
+            using (MainForm form = new MainForm { OfflinePreview = true })
+            {
+                foreach (string scenario in new[] { "normal", "name-hint", "partial-group" })
+                {
+                    ReceiverGroup group = new ReceiverGroup
+                    {
+                        Name = "独立音响测试", Members = new List<Receiver> { Speaker("独立音响测试", 1) },
+                        Inferred = scenario == "name-hint",
+                        InferredPairName = scenario == "name-hint" ? "独立音响测试" : "",
+                        GroupId = scenario == "partial-group" ? "unconfirmed-group" : ""
+                    };
+                    var groups = (List<ReceiverGroup>)Field(form, "groups");
+                    groups.Clear(); groups.Add(group);
+                    Call(form, "RebuildDeviceList");
+                    CheckAt(form, 0).Checked = true;
+                    object row = ((IList)Field(form, "deviceRows"))[0];
+                    var tips = (ToolTip)Field(form, "uiTips");
+                    string title = tips.GetToolTip(CheckAt(form, 0));
+                    string detail = typeof(MainForm).GetMethod("CompactTargetDetail",
+                        BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { group }) as string;
+                    check("UI independent " + scenario + " has neutral name and IP without pair warnings",
+                        title.Contains("独立音响") && !title.Contains("疑似") && !title.Contains("不完整") &&
+                        detail == "独立音响 · 192.0.2.1", null);
+                    check("UI independent " + scenario + " retains playable state and normal color",
+                        ((Button)Field(form, "playButton")).Enabled &&
+                        ((Label)Field(row, "State")).Text == "已选择" &&
+                        !((Label)Field(form, "routeHint")).Text.Contains("疑似") &&
+                        ((Label)Field(row, "State")).ForeColor == ((Label)Field(form, "targetDetail")).ForeColor, null);
+                    Call(form, "ClearSelection");
+                }
+            }
+            // Exercise genuine activation loss between two transparent test windows.
+            // No user settings, scan, playback or prior tray action is involved.
             using (MainForm popup = new MainForm())
+            using (Form focusSink = new Form { Opacity = 0, ShowInTaskbar = false })
             {
                 popup.OfflinePreview = true;
-                IntPtr handle = popup.Handle;
-                // A hidden WinForms handle can still acquire focus in the isolated
-                // test desktop. Disable it to model focus having moved elsewhere.
-                popup.Enabled = false;
+                popup.Opacity = 0;
+                popup.Show();
+                // Drain queued first-show activation before transferring focus.
+                // Otherwise a delayed popup activation can invalidate the test setup.
+                Application.DoEvents();
+                popup.Opacity = 0;
+                var focusTarget = new TextBox { Dock = DockStyle.Fill };
+                focusSink.Controls.Add(focusTarget);
+                focusSink.Show();
+                SetActiveWindow(focusSink.Handle);
+                focusSink.Activate();
+                focusTarget.Focus();
+                Application.DoEvents();
+                check("UI dismissal test genuinely transfers focus away from popup",
+                    !popup.ContainsFocus && Form.ActiveForm != popup,
+                    "ContainsFocus=" + popup.ContainsFocus + "; ActiveFormIsPopup=" + (Form.ActiveForm == popup));
                 System.Windows.Forms.Timer timer = (System.Windows.Forms.Timer)Field(popup, "dismissTimer");
                 try
                 {
@@ -214,7 +257,7 @@ namespace AirStereo.Ui
                 Populate(form, new List<Receiver> { a });
                 check("UI missing confirmed native peer disables playback and explains why",
                     !((Button)Field(form, "playButton")).Enabled &&
-                    ((ToolStripStatusLabel)Field(form, "statusLabel")).Text.Contains("信息不完整"), null);
+                    ((ToolStripStatusLabel)Field(form, "statusLabel")).Text.Contains("等待另一只音响"), null);
                 Populate(form, new List<Receiver> { b, a });
                 check("UI rescanning the returning native peer restores one playable pair",
                     ((IList)Field(form, "deviceRows")).Count == 1 && CheckAt(form, 0).Checked &&
@@ -412,6 +455,8 @@ namespace AirStereo.Ui
                         settings.Font = new Font(font.FontFamily, fontSize * scale, FontStyle.Regular);
                         settings.ClientSize = new Size((int)(760 * scale), (int)(620 * scale));
                         CreateHandles(settings);
+                        settings.Opacity = 0;
+                        settings.Show();
                         SettingsTabs tabs = (SettingsTabs)((DarkSettingsForm)settings).ContentHost.Controls[0];
                         string detail = "";
                         for (int index = 0; index < tabs.PageCount; index++)
@@ -512,6 +557,64 @@ namespace AirStereo.Ui
         }
         private static void VerifyDiagnostics(Action<string, bool, string> check)
         {
+            using (MainForm scan = new MainForm { OfflinePreview = true, Opacity = 0 })
+            {
+                IntPtr handle = scan.Handle;
+                MethodInfo apply = typeof(MainForm).GetMethod("Apply", Private);
+                foreach (int interfaces in new[] { 1, 2 })
+                {
+                    apply.Invoke(scan, new object[] { new Discovery
+                        { Last = new MdnsBrowser.Result { InterfacesJoined = interfaces } } });
+                    Application.DoEvents();
+                    check("UI successful empty scan stays neutral with interfaces=" + interfaces,
+                        ((ToolStripStatusLabel)Field(scan, "statusLabel")).Text == "未发现音响" &&
+                        !((Button)Field(scan, "playButton")).Enabled &&
+                        ((Button)Field(scan, "scanButton")).Enabled, null);
+                }
+                apply.Invoke(scan, new object[] { new Discovery { Last = new MdnsBrowser.Result() } });
+                Application.DoEvents();
+                check("UI unavailable network is not overwritten by empty-scan status",
+                    ((ToolStripStatusLabel)Field(scan, "statusLabel")).Text == "网络不可用", null);
+                Call(scan, "UpdateButtons");
+                check("UI scan completion keeps unavailable network status",
+                    ((ToolStripStatusLabel)Field(scan, "statusLabel")).Text == "网络不可用", null);
+                check("diagnostics unavailable network snapshot matches its failure category",
+                    ((string)Call(scan, "DiagnosticContext")).Contains("状态=网络不可用"), null);
+                Receiver speaker = Speaker("重新发现的音响", 1);
+                apply.Invoke(scan, new object[] { new Discovery
+                {
+                    Last = new MdnsBrowser.Result { InterfacesJoined = 1 },
+                    Receivers = new List<Receiver> { speaker },
+                    Groups = ReceiverCatalog.Group(new List<Receiver> { speaker })
+                } });
+                Application.DoEvents();
+                CheckAt(scan, 0).Checked = true;
+                check("UI successful later scan restores selectable playback target",
+                    ((Button)Field(scan, "playButton")).Enabled &&
+                    ((ToolStripStatusLabel)Field(scan, "statusLabel")).Text == "已选择", null);
+            }
+            const string eventClosed = "event channel closed: 音响「家庭影院」（192.168.1.18:7000）: ";
+            check("diagnostics auxiliary event EOF is informational rather than a fault",
+                !MainForm.ShouldRecordPlaybackWarning(eventClosed + "receiver closed the control connection"), null);
+            check("diagnostics legacy event EOF remains informational",
+                !MainForm.ShouldRecordPlaybackWarning("event channel closed: receiver closed the control connection"), null);
+            check("diagnostics event EOF classification is case insensitive",
+                !MainForm.ShouldRecordPlaybackWarning((eventClosed + "receiver closed the control connection").ToUpperInvariant()), null);
+            check("diagnostics actual event read failure remains a fault",
+                MainForm.ShouldRecordPlaybackWarning(eventClosed + "control read failed (ConnectionReset)"), null);
+            check("diagnostics event encryption error remains a fault",
+                MainForm.ShouldRecordPlaybackWarning(eventClosed + "invalid authentication tag"), null);
+            check("diagnostics repeated feedback failures remain a fault",
+                MainForm.ShouldRecordPlaybackWarning("warning: receiver has repeated control feedback failures"), null);
+            check("diagnostics missing PTP replies remain a fault",
+                MainForm.ShouldRecordPlaybackWarning("warning: a receiver has not replied to PTP; shared-clock synchronization cannot be verified"), null);
+            check("diagnostics PTP fallback remains a fault",
+                MainForm.ShouldRecordPlaybackWarning("PTP unavailable (socket failed), falling back to NTP timing"), null);
+            check("diagnostics warning containing event EOF is not hidden",
+                MainForm.ShouldRecordPlaybackWarning("warning: " + eventClosed + "receiver closed the control connection"), null);
+            check("diagnostics ordinary media progress is not a fault",
+                !MainForm.ShouldRecordPlaybackWarning("streaming ALAC") &&
+                !MainForm.ShouldRecordPlaybackWarning(null), null);
             using (CalibrationForm eq = new CalibrationForm(new AudioProfileController(), AudioProfile.Flat, null))
             {
                 CreateHandles(eq);

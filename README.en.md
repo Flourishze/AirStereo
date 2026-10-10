@@ -6,7 +6,7 @@
 	<img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200"/>
 </a>
 
-Windows x64 AirPlay audio sender. The current version is **1.0.5**. Source and standalone releases are published at [Flourishze/AirStereo](https://github.com/Flourishze/AirStereo). The Store edition is updated by Microsoft Store.
+Windows x64 AirPlay audio sender. The current version is **1.0.6**. Source and standalone releases are published at [Flourishze/AirStereo](https://github.com/Flourishze/AirStereo). The Store edition is updated by Microsoft Store.
 
 ## What Is AirStereo?
 
@@ -38,16 +38,18 @@ It is an audio sender, not a music player, and it does not connect over Bluetoot
 
 ## Interface Preview
 
-![AirStereo speaker list and audio settings overview (Chinese interface)](docs/images/airstereo-overview-zh-cn.png)
+![AirStereo 1.0.6 dark appearance](docs/images/airstereo-1.0.6-dark.png)
+
+![AirStereo 1.0.6 light appearance](docs/images/airstereo-1.0.6-light.png)
 
 Offline preview of the actual interface: speaker names and addresses are demonstration data, not evidence of a live device connection.
 
 ## Installation and Usage
 
-Use EXE for the installation wizard or MSI for deployment. Install the Store-signed edition from Microsoft Store; the unsigned MSIX asset is for Store submission. Do not run both editions simultaneously.
+Use EXE for the installation wizard or MSI for deployment. Install the Store-signed edition from Microsoft Store; MSIX submission packages are managed separately by the maintainer, not offered as unsigned end-user installers. Do not run both editions simultaneously.
 
 
-Download `AirStereo-Setup-1.0.5-x64.exe` from the repository's Releases page. Exit an older version from the tray menu before installing. The installer includes the .NET Core and Windows Desktop 10.0.12 runtimes and prefers the runtimes in the installation directory. No separate .NET runtime installation is required; the operating system must still be a Windows x64 version supported by .NET 10.
+Download `AirStereo-Setup-1.0.6-x64.exe` from the repository's Releases page. Exit an older version from the tray menu before installing. The installer includes the .NET Core and Windows Desktop 10.0.12 runtimes and prefers the runtimes in the installation directory. No separate .NET runtime installation is required; the operating system must still be a Windows x64 version supported by .NET 10.
 
 1. Click the AirStereo tray icon in the lower-right corner, scan for speakers, and select the targets you want to use.
 2. Playback is disabled when nothing is selected. Selecting one independent speaker sends full stereo audio and disables the left/right balance control.
@@ -59,20 +61,21 @@ Actual compatibility depends on receiver firmware, access permissions, network c
 
 Wireless playback includes capture, network, and receiver-buffer delays. The configured latency is not a measurement of end-to-end latency. AirStereo does not promise zero latency and is not a replacement for low-latency gaming audio or real-time monitoring equipment.
 
-## What's New in 1.0.5
+## What's New in 1.0.6
 
-- Native ALAC is now the default media codec (44.1/48 kHz, stereo, 16-bit, 352 frames per packet). Diagnostics and the tray connection state expose the active codec parameters; `--pcm` remains an experimental fallback.
-- Media packets and the RTP timeline continue during source silence. The default `repeat-last` silence frame is used, and graceful disconnect occurs only after 90 minutes of continuously confirmed source silence. `--silence-mode=zero` is available for experiments.
-- Prevented capture starvation with no source audio from accumulating sender lateness and skipping media slots; filler blocks continue to be sent during starvation.
-- Added local-output muting while streaming, startup auto-connect, and diagnostic-log follow suspension after user scrolling with automatic recovery after 10 seconds of inactivity.
-- Existing routing, PTP, retransmission, EQ, channel tests and high-DPI layouts are retained.
-
-Offline SelfTest passed. HomePod hardware acceptance still requires user testing on the target devices and is not claimed by offline tests. The unresolved left-button drag issue on the diagnostic scrollbar is not claimed as fixed.
+- Added optional real-time volume: when disabled, drag and click ✓ to apply; when enabled, dragging applies automatically. Manual mode remains the default.
+- Added system, light and dark appearance with consistent settings cards, native dropdowns, buttons and lightweight transitions.
+- Refreshed the app and transparent tray icons; improved refresh controls, EQ alignment, compact layouts and large-text presentation.
+- Fixed selection-marker trails after dropdown hover and improved buffered drawing while retaining native selection and keyboard behavior.
+- Simplified independent-speaker labels. Empty scans are status messages; unavailable networks, connection failures and interrupted playback still create fault records.
+- Refined auxiliary control-channel warning classification without discarding diagnostic log details.
+- Fixed an uninitialized ALAC magic-cookie buffer capacity that could cause encoder initialization to fail.
+- Retained single-speaker, independent L/R and native-pair routes, EQ, balance, test tones and latency settings.
 
 ## Settings
 
-- **Audio**: volume, latency, left/right balance, balance reset, left/right test tones, and equalizer. Volume, balance, and test tones remain available during playback. Adjust latency after stopping playback; the change takes effect on the next playback session. Test tones temporarily bypass the user balance value and restore it when testing ends.
-- **General**: launch at startup, runtime and current-version information, and manual update checks. Update checks use only the latest stable Release in this repository, not drafts or pre-releases. A timeout is reported as a failed check rather than incorrectly reporting that the application is up to date. The new-version button opens the official Release page and does not download or execute files automatically.
+- **Audio**: optional real-time volume (off: drag then click ✓; on: apply automatically while dragging), volume, latency, left/right balance, balance reset, left/right test tones, and equalizer. Volume, balance, and test tones remain available during playback. Adjust latency after stopping playback; the change takes effect on the next playback session. Test tones temporarily bypass the user balance value and restore it when testing ends.
+- **General**: system/light/dark appearance, launch at startup, runtime and current-version information, and manual update checks. Update checks use only the latest stable Release in this repository, not drafts or pre-releases. A timeout is reported as a failed check rather than incorrectly reporting that the application is up to date. The new-version button opens the official Release page and does not download or execute files automatically.
 - **Diagnostics**: view issues and open the actual diagnostics folder. The folder can be opened even when no records exist; it is created automatically when necessary. Logs are written to the installation directory's `Diagnostics` folder when possible, with a fallback to the current user's local application-data directory at `AirStereo/Diagnostics` when the installation directory is not writable.
 - **Runtime log**: view current runtime information.
 
@@ -86,7 +89,7 @@ For a bug report, include the AirStereo version, Windows version, display scalin
 
 ## Build and Documentation
 
-See the [build guide](docs/BUILD.md), [acceptance checklist](docs/TESTING.md), [changelog](CHANGELOG.md), and [1.0.5 release notes](docs/releases/v1.0.5.md). The repository includes the application source and packaging scripts. The original source for the existing installer wizard is not included, so packaging still depends on the explicitly documented binary template.
+See the [build guide](docs/BUILD.md), [acceptance checklist](docs/TESTING.md), [changelog](CHANGELOG.md), and [1.0.6 release notes](docs/releases/v1.0.6.md). The repository includes the application source and packaging scripts. The original source for the existing installer wizard is not included, so packaging still depends on the explicitly documented binary template.
 
 ## License
 

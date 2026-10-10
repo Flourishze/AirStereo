@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [switch]$Run,
     [switch]$Shortcut,
@@ -70,6 +70,11 @@ foreach ($directory in @($shared.FullName, $desktop.FullName)) {
 }
 foreach ($path in $references.Values) { $cscArgs.Add("-r:$path") }
 
+foreach ($name in @('AirStereo', 'tray-light', 'tray-dark')) {
+    $asset = Join-Path $root "assets\icons\$name.ico"
+    if (-not (Test-Path -LiteralPath $asset)) { throw "Missing icon asset: $name.ico" }
+    $cscArgs.Add("/resource:$asset,AirStereo.Icons.$name.ico")
+}
 foreach ($source in $sources) { $cscArgs.Add($source) }
 
 & $compiler $cscArgs
@@ -114,48 +119,11 @@ if "%~1"=="" (
 # AirStereo.exe is a small native stub that starts the managed assembly. It is only built
 # when a C toolchain is present; the app works without it through AirStereo.cmd.
 function Build-LauncherIcon([string]$path) {
-    $bitmap = $null
-    $graphics = $null
-    $icon = $null
-    $stream = $null
-    try {
-        Add-Type -AssemblyName System.Drawing
-        $bitmap = [System.Drawing.Bitmap]::new(64, 64)
-        $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
-        $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-        $graphics.Clear([System.Drawing.Color]::Transparent)
-
-        $fill = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(19, 142, 148))
-        $line = [System.Drawing.Pen]::new([System.Drawing.Color]::White, 4)
-        try {
-            $graphics.FillEllipse($fill, 2, 2, 60, 60)
-            $graphics.DrawLine($line, 16, 38, 22, 38)
-            $graphics.DrawLine($line, 22, 38, 28, 24)
-            $graphics.DrawLine($line, 28, 24, 36, 46)
-            $graphics.DrawLine($line, 36, 46, 44, 18)
-            $graphics.DrawLine($line, 44, 18, 50, 38)
-        }
-        finally {
-            $fill.Dispose()
-            $line.Dispose()
-        }
-
-        $handle = $bitmap.GetHicon()
-        $icon = [System.Drawing.Icon]::FromHandle($handle)
-        $stream = [System.IO.File]::Open($path, [System.IO.FileMode]::Create)
-        $icon.Save($stream)
-        return $true
-    }
-    catch {
-        Write-Warning ("could not create launcher icon: " + $_.Exception.Message)
-        return $false
-    }
-    finally {
-        if ($stream) { $stream.Dispose() }
-        if ($icon) { $icon.Dispose() }
-        if ($graphics) { $graphics.Dispose() }
-        if ($bitmap) { $bitmap.Dispose() }
-    }
+    # Use exactly the same multi-resolution artwork as the managed window.
+    $asset = Join-Path $root 'assets\icons\AirStereo.ico'
+    if (-not (Test-Path -LiteralPath $asset)) { throw 'Missing AirStereo.ico' }
+    Copy-Item -LiteralPath $asset -Destination $path -Force
+    return $true
 }
 
 function Build-Launcher([string]$OutputDirectory) {

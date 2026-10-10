@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -18,16 +18,16 @@ namespace AirStereo.Ui
     /// </summary>
     public sealed partial class MainForm : Form
     {
-        private static readonly Color CanvasColor = Color.FromArgb(23, 25, 29);
-        private static readonly Color PanelColor = Color.FromArgb(35, 38, 44);
-        private static readonly Color BorderColor = Color.FromArgb(63, 68, 77);
-        private static readonly Color InkColor = Color.FromArgb(239, 241, 244);
-        private static readonly Color MutedColor = Color.FromArgb(163, 170, 182);
-        private static readonly Color AccentColor = Color.FromArgb(119, 169, 247);
-        private static readonly Color AccentDarkColor = Color.FromArgb(149, 190, 255);
-        private static readonly Color AccentPaleColor = Color.FromArgb(43, 54, 70);
-        private static readonly Color LogBackColor = Color.FromArgb(27, 29, 34);
-        private static readonly Color LogTextColor = Color.FromArgb(202, 211, 222);
+        private static Color CanvasColor => DesktopTheme.Canvas;
+        private static Color PanelColor => DesktopTheme.Surface;
+        private static Color BorderColor => DesktopTheme.Border;
+        private static Color InkColor => DesktopTheme.Ink;
+        private static Color MutedColor => DesktopTheme.Muted;
+        private static Color AccentColor => DesktopTheme.StrongAccent;
+        private static Color AccentDarkColor => DesktopTheme.Accent;
+        private static Color AccentPaleColor => DesktopTheme.Selection;
+        private static Color LogBackColor => DesktopTheme.Log;
+        private static Color LogTextColor => DesktopTheme.LogInk;
 
         private readonly List<ReceiverGroup> groups = new List<ReceiverGroup>();
         private readonly List<DeviceRow> deviceRows = new List<DeviceRow>();
@@ -77,13 +77,13 @@ namespace AirStereo.Ui
         private ToolStripStatusLabel statusLabel;
         private NotifyIcon trayIcon;
         private Font titleFont;
-        private Bitmap appIconBitmap;
         private Icon appIcon;
 
         private ManualResetEventSlim playStop;
         private Thread playWorker;
         private volatile bool playing;
         private volatile bool scanning;
+        private bool scanNetworkUnavailable;
         private volatile bool volumeBusy;
         private bool recoveringConnection;
         private bool selectionSyncing;
@@ -137,6 +137,7 @@ namespace AirStereo.Ui
             BuildLayout();
             BuildAppIcon();
             BuildTrayIcon();
+            InitializeAppearance();
         }
 
         private static Font PickFont()
@@ -147,21 +148,7 @@ namespace AirStereo.Ui
 
         private void BuildAppIcon()
         {
-            appIconBitmap = new Bitmap(32, 32);
-            using (Graphics graphics = Graphics.FromImage(appIconBitmap))
-            using (SolidBrush fill = new SolidBrush(AccentColor))
-            using (Pen line = new Pen(Color.White, 2F))
-            {
-                graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                graphics.Clear(Color.Transparent);
-                graphics.FillEllipse(fill, 1, 1, 30, 30);
-                graphics.DrawLine(line, 8, 19, 11, 19);
-                graphics.DrawLine(line, 11, 19, 14, 12);
-                graphics.DrawLine(line, 14, 12, 18, 23);
-                graphics.DrawLine(line, 18, 23, 22, 9);
-                graphics.DrawLine(line, 22, 9, 25, 19);
-            }
-            appIcon = Icon.FromHandle(appIconBitmap.GetHicon());
+            appIcon = AppIcons.Load("AirStereo", Math.Max(32, DeviceDpi / 3));
             Icon = appIcon;
         }
 
@@ -289,7 +276,7 @@ namespace AirStereo.Ui
             menu.Items.Add(quit);
 
             trayIcon = new NotifyIcon();
-            trayIcon.Icon = appIcon;
+            UpdateNotificationIcon();
             trayIcon.Text = "AirStereo · 立体声 AirPlay 发送器";
             trayIcon.ContextMenuStrip = menu;
             trayIcon.MouseClick += delegate (object sender, MouseEventArgs args)
@@ -838,6 +825,7 @@ namespace AirStereo.Ui
             if (OfflinePreview) return;
             titleFont = SafeBold(Font, Font.Size);
             KeyDown += OnKeyDown;
+            LoadAppearance();
             LoadSettings();
             InitializeStartupFeatures();
             // This is a borderless tray popup, so an invalid pre-handle DPI or a stale
@@ -883,6 +871,8 @@ namespace AirStereo.Ui
             if (disposing && !OfflinePreview) FaultStore.Default.Activity("窗口生命周期：Dispose");
             if (disposing)
             {
+                DesktopTheme.Changed -= OnAppearanceChanged;
+                DisposeVolumeAdjustment();
                 DisposeFeatures();
                 if (dismissTimer != null) dismissTimer.Dispose();
                 if (settingsForm != null) settingsForm.Dispose();
@@ -901,11 +891,8 @@ namespace AirStereo.Ui
                     appIcon.Dispose();
                     appIcon = null;
                 }
-                if (appIconBitmap != null)
-                {
-                    appIconBitmap.Dispose();
-                    appIconBitmap = null;
-                }
+                notificationIcon?.Dispose();
+                notificationIcon = null;
             }
             base.Dispose(disposing);
         }
@@ -1038,7 +1025,9 @@ namespace AirStereo.Ui
             else if (selected.Count == 2)
                 routeHint.Text = "双设备立体声 · " + balance;
             else if (first.StereoPairId.Length > 0 && !first.IsStereoPair)
-                routeHint.Text = "原生配对成员不完整 · 请刷新";
+                routeHint.Text = "原生配对 · 等待另一只音响";
+            else if (PlaybackRoute.Independent(first))
+                routeHint.Text = "完整立体声 · " + balance;
             else if (first.IsSuspectedPair || first.IsIncompleteGroup)
                 routeHint.Text = "疑似配对 · " + balance;
             else
@@ -1078,6 +1067,7 @@ namespace AirStereo.Ui
                 autoConnectAttempts++;
             }
             scanning = true;
+            scanNetworkUnavailable = false;
             SetStatus("扫描中…");
             UpdateButtons();
             Log("开始扫描（约 6 秒）");
@@ -1117,6 +1107,7 @@ namespace AirStereo.Ui
             Post(delegate
             {
                 if (IsDisposed) return;
+                scanNetworkUnavailable = found.Last.InterfacesJoined == 0;
                 groups.Clear();
                 groups.AddRange(found.Groups);
                 RefreshAutoConnectDevices();
@@ -1127,17 +1118,17 @@ namespace AirStereo.Ui
                 if (found.Last.InterfacesJoined == 0)
                 {
                     Log("这台电脑没有找到可用的 IPv4 网络接口，无法搜索。");
-                    RecordFault("网络不可用", "未找到可用的 IPv4 网络接口");
-                    SetStatus("网络不可用");
                     UpdateButtons();
+                    SetStatus("网络不可用");
+                    RecordFault("网络不可用", "未找到可用的 IPv4 网络接口");
                     return;
                 }
 
                 if (groups.Count == 0)
                 {
                     Log("没有发现 AirPlay 音箱。确认电脑和音箱在同一个局域网，然后按 F5 重试。");
-                    RecordFault("扫描未发现设备", "当前局域网没有返回可连接的 AirPlay 目标");
-                    SetStatus("没有发现音箱");
+                    // An empty successful scan is not a fault; keep it in the activity log.
+                    SetStatus("未发现音响");
                     targetDetail.Text = "";
                     UpdateButtons();
                     return;
@@ -1253,7 +1244,7 @@ namespace AirStereo.Ui
             DeviceRow item = new DeviceRow();
             item.Group = group;
             item.SelectionKey = SelectionKey(group);
-            BufferedTableLayoutPanel row = new BufferedTableLayoutPanel();
+            BufferedTableLayoutPanel row = new BufferedTableLayoutPanel { Card = true };
             row.Height = Math.Max(UiPixels(88), Font.Height * 4 + UiPixels(12));
             row.Dock = DockStyle.Top;
             row.Margin = new Padding(0, 0, 0, 2);
@@ -1266,7 +1257,7 @@ namespace AirStereo.Ui
             row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
             row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UiPixels(40)));
 
-            CheckBox check = new CheckBox { Dock = DockStyle.Fill, CheckAlign = ContentAlignment.MiddleCenter,
+            CheckBox check = new FluentCheckBox { Dock = DockStyle.Fill, CheckAlign = ContentAlignment.MiddleCenter,
                 ThreeState = false, Margin = new Padding(0) };
             item.Check = check;
             check.CheckedChanged += delegate { OnDeviceCheckChanged(item); };
@@ -1283,7 +1274,7 @@ namespace AirStereo.Ui
             detail.Controls.Add(name);
 
             Label state = new Label { Text = TargetState(group), Dock = DockStyle.Bottom, Height = UiPixels(24),
-                ForeColor = group.IsIncompleteGroup ? Color.FromArgb(178, 112, 26) : MutedColor,
+                ForeColor = MutedColor,
                 TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true };
             item.State = state;
             detail.Controls.Add(state);
@@ -1328,7 +1319,8 @@ namespace AirStereo.Ui
                 row.State.Text = selected ? (playing ? (streamReady ? "播放中" :
                     statusLabel.Text.StartsWith("缓冲中", StringComparison.Ordinal) ? "缓冲中" :
                     recoveringConnection ? "恢复连接" : "连接中") : sessionState) : "在线 · 未连接";
-                if (row.Group.IsIncompleteGroup) row.State.Text = "在线 · 成员信息不完整";
+                if (row.Group.StereoPairId.Length > 0 && !row.Group.IsStereoPair)
+                    row.State.Text = "在线 · 等待另一只音响";
                 if (row.Action is IconButton action)
                 {
                     action.Symbol = playing && selected ? Glyph.Stop : Glyph.Play;
@@ -1353,6 +1345,8 @@ namespace AirStereo.Ui
                 ? group.Name
                 : (group.Members.Count > 0 ? group.Members[0].Instance : "未知音箱");
             if (group.IsStereoPair) return name + "  ·  立体声对 · 2 只";
+            if (PlaybackRoute.Independent(group)) return name + "  ·  独立音响";
+            if (group.StereoPairId.Length > 0) return name + "  ·  配对音响";
             if (group.IsSuspectedPair) return name + "  ·  独立选择 · 疑似配对";
             if (group.IsIncompleteGroup) return name + (group.StereoPairId.Length > 0
                 ? "  ·  原生配对 · 成员不完整" : "  ·  疑似配对 · 信息不完整");
@@ -1382,6 +1376,8 @@ namespace AirStereo.Ui
         private static string TargetState(ReceiverGroup group)
         {
             if (group.IsStereoPair) return "在线\r\n原生配对";
+            if (PlaybackRoute.Independent(group)) return "在线\r\n独立音响";
+            if (group.StereoPairId.Length > 0) return "在线 · 等待另一只音响";
             if (group.IsSuspectedPair) return "在线\r\n疑似配对";
             if (group.IsIncompleteGroup) return "在线\r\n信息不完整";
             return "在线\r\n" + (group.IsGroup ? "组合目标" : "独立音响");
@@ -1543,9 +1539,7 @@ namespace AirStereo.Ui
             Log(message);
             if (message.StartsWith("Codec diagnostics:", StringComparison.Ordinal))
                 UpdateCodecFromDiagnostics(message);
-            if (message.StartsWith("warning:", StringComparison.OrdinalIgnoreCase) ||
-                message.StartsWith("PTP unavailable", StringComparison.OrdinalIgnoreCase) ||
-                message.Contains("event channel closed:", StringComparison.OrdinalIgnoreCase))
+            if (ShouldRecordPlaybackWarning(message))
                 RecordFault("连接或同步警告", message);
             if (message.StartsWith("connected:", StringComparison.OrdinalIgnoreCase))
             {
@@ -1584,53 +1578,6 @@ namespace AirStereo.Ui
             worker.Join(milliseconds);
         }
 
-        private void ApplyVolume()
-        {
-            ReceiverGroup group = PlaybackTarget();
-            if (group == null)
-            {
-                Log("先选好连接目标再调音量。");
-                return;
-            }
-
-            int percent = volumeBar.Value;
-            volumeBusy = true;
-            UpdateButtons();
-
-            Thread worker = new Thread(delegate ()
-            {
-                try
-                {
-                    string asked = "-> " + percent.ToString(CultureInfo.InvariantCulture) + "%";
-                    bool everywhere = true;
-                    foreach (string line in AirStereoApi.SetVolume(group, percent, Srp.DefaultPin, Log))
-                    {
-                        Log("音量 " + line);
-                        if (!line.EndsWith(asked, StringComparison.Ordinal)) everywhere = false;
-                    }
-                    Log(everywhere
-                        ? "音量已生效：「" + TargetTitle(group) + "」现在都是 " +
-                            percent.ToString(CultureInfo.InvariantCulture) + "%（音箱自己回报的值）。"
-                        : "音量请求已发出，但有音箱回报的值不是 " +
-                            percent.ToString(CultureInfo.InvariantCulture) +
-                            "%，上面的箭头右侧是它现在真正的音量。");
-                }
-                catch (Exception error)
-                {
-                    Log("设置音量失败：" + error.Message);
-                    RecordFault("音量设置失败", error.Message, error);
-                }
-                finally
-                {
-                    volumeBusy = false;
-                    Post(UpdateButtons);
-                }
-            });
-            worker.IsBackground = true;
-            worker.Name = "air-stereo-volume";
-            worker.Start();
-        }
-
         // ---------------------------------------------------------------- plumbing
 
         private void UpdateButtons()
@@ -1642,7 +1589,7 @@ namespace AirStereo.Ui
             playButton.Enabled = hasTarget && selectedCount <= 2 && !playing && !scanning;
             patternButton.Enabled = hasTarget && !playing && !scanning;
             stopButton.Enabled = playing;
-            volumeButton.Enabled = hasTarget && !volumeBusy;
+            UpdateVolumeAdjustmentUi(hasTarget);
             volumeBar.Enabled = hasTarget;
             calibrationButton.Enabled = true;
             targetList.Enabled = !scanning;
@@ -1671,8 +1618,13 @@ namespace AirStereo.Ui
                 SetStatus("扫描中…");
                 return;
             }
-            if (!hasTarget) SetStatus(groups.Count == 0 ? "没有发现音箱" :
-                selectedCount > 0 ? "已选择 · 配对成员信息不完整，请刷新" : "请选择音响");
+            if (scanNetworkUnavailable)
+            {
+                SetStatus("网络不可用");
+                return;
+            }
+            if (!hasTarget) SetStatus(groups.Count == 0 ? "未发现音响" :
+                selectedCount > 0 ? "已选择 · 等待另一只音响，请刷新" : "请选择音响");
             else SetStatus("已选择");
         }
 
@@ -1810,7 +1762,8 @@ namespace AirStereo.Ui
                     if (equals <= 0) continue;
                     string key = line.Substring(0, equals).Trim();
                     string value = line.Substring(equals + 1).Trim();
-                    if (key == "muteLocalOutput") muteLocalOutputBox.Checked = value == "1";
+                    if (key == "realtimeVolume") LoadVolumeModeSetting(value);
+                    else if (key == "muteLocalOutput") muteLocalOutputBox.Checked = value == "1";
                     else if (key == "autoConnect") autoConnectBox.Checked = value == "1";
                     else if (key == "autoConnectDevices")
                     { autoConnectIdentities.Clear(); autoConnectIdentities.AddRange(StartupConnectionPolicy.Decode(value)); }
@@ -1873,6 +1826,7 @@ namespace AirStereo.Ui
                     "autoConnect=" + (autoConnectBox.Checked ? "1" : "0") + Environment.NewLine +
                     "autoConnectDevices=" + StartupConnectionPolicy.Encode(autoConnectIdentities) + Environment.NewLine +
                     "volume=" + volumeBar.Value.ToString(CultureInfo.InvariantCulture) + Environment.NewLine +
+                    VolumeModeSettingsLine() + Environment.NewLine +
                     "selectedDevices=" + SaveSelectedDevices() + Environment.NewLine +
                     "stereoBalance=" + balancePreference.ToString(CultureInfo.InvariantCulture) + Environment.NewLine +
                     "latencyMode=" + LatencyProfile.ModeName(selectedMode) + Environment.NewLine +
@@ -1996,6 +1950,7 @@ namespace AirStereo.Ui
 
         private sealed class BufferedTableLayoutPanel : TableLayoutPanel
         {
+            internal bool Card { get; set; }
             public BufferedTableLayoutPanel()
             {
                 SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
@@ -2003,6 +1958,22 @@ namespace AirStereo.Ui
                 BackColor = PanelColor;
                 Margin = new Padding(0);
                 Padding = new Padding(0);
+            }
+
+            protected override void OnPaintBackground(PaintEventArgs args)
+            {
+                if (!Card || Parent == null) { base.OnPaintBackground(args); return; }
+                args.Graphics.Clear(Parent.BackColor);
+                args.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                int gap = Math.Max(2, DeviceDpi * 2 / 96);
+                using (GraphicsPath shape = RoundedRectangle(new Rectangle(0, gap,
+                    Math.Max(1, Width - 1), Math.Max(1, Height - gap * 2 - 1)), Math.Max(7, DeviceDpi * 7 / 96)))
+                using (SolidBrush fill = new SolidBrush(BackColor))
+                using (Pen border = new Pen(BorderColor))
+                {
+                    args.Graphics.FillPath(fill, shape);
+                    args.Graphics.DrawPath(border, shape);
+                }
             }
         }
 
@@ -2041,11 +2012,12 @@ namespace AirStereo.Ui
             {
                 Graphics graphics = arguments.Graphics;
                 graphics.Clear(Parent == null ? PanelColor : Parent.BackColor);
+                graphics.SmoothingMode = SmoothingMode.AntiAlias;
                 int diameter = Math.Max(12, (int)Math.Round(13 * DeviceDpi / 96.0));
                 int top = Math.Max(0, (Height - diameter) / 2);
-                Color ring = InputLocked ? Color.FromArgb(100, 107, 119) :
-                    (Checked ? AccentColor : Color.FromArgb(204, 210, 219));
-                Color dot = InputLocked ? Color.FromArgb(128, 135, 147) : AccentColor;
+                Color ring = InputLocked ? DesktopTheme.Disabled :
+                    (Checked ? AccentColor : DesktopTheme.Muted);
+                Color dot = InputLocked ? DesktopTheme.Disabled : AccentColor;
                 using (Pen pen = new Pen(ring, Math.Max(1F, DeviceDpi / 96F)))
                 using (SolidBrush brush = new SolidBrush(dot))
                 {
@@ -2063,6 +2035,8 @@ namespace AirStereo.Ui
                 TextRenderer.DrawText(graphics, Text, Font, textBounds, ForeColor,
                     TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis |
                     TextFormatFlags.NoPrefix);
+                if (Focused && ShowFocusCues)
+                    ControlPaint.DrawFocusRectangle(graphics, textBounds, ForeColor, BackColor);
             }
         }
         private sealed class ThemedSection : Panel
@@ -2083,7 +2057,7 @@ namespace AirStereo.Ui
                 Graphics graphics = arguments.Graphics;
                 graphics.SmoothingMode = SmoothingMode.AntiAlias;
                 Rectangle frame = new Rectangle(0, 0, Math.Max(1, Width - 1), Math.Max(1, Height - 1));
-                using (GraphicsPath path = RoundedRectangle(frame, 7))
+                using (GraphicsPath path = RoundedRectangle(frame, Math.Max(7, DeviceDpi * 7 / 96)))
                 using (Pen pen = new Pen(BorderColor, 1F))
                 {
                     graphics.DrawPath(pen, path);
@@ -2130,14 +2104,15 @@ namespace AirStereo.Ui
 
         private sealed class IconButton : Button
         {
+            private readonly UiMotion hoverMotion;
             public Glyph Symbol { get; set; }
-            private bool hovered;
             private bool pressed;
 
             public bool Accent { get; set; }
 
             public IconButton(Glyph glyph)
             {
+                hoverMotion = new UiMotion(this);
                 Symbol = glyph;
                 Accent = glyph == Glyph.Play;
                 FlatStyle = FlatStyle.Flat;
@@ -2151,14 +2126,14 @@ namespace AirStereo.Ui
 
             protected override void OnMouseEnter(EventArgs arguments)
             {
-                hovered = true;
+                hoverMotion.To(1);
                 Invalidate();
                 base.OnMouseEnter(arguments);
             }
 
             protected override void OnMouseLeave(EventArgs arguments)
             {
-                hovered = false;
+                hoverMotion.To(0);
                 pressed = false;
                 Invalidate();
                 base.OnMouseLeave(arguments);
@@ -2195,21 +2170,21 @@ namespace AirStereo.Ui
                 if (!Enabled)
                 {
                     background = PanelColor;
-                    foreground = Color.FromArgb(99, 106, 117);
+                    foreground = DesktopTheme.Disabled;
                 }
                 else if (Accent)
                 {
-                    background = pressed ? AccentDarkColor : (hovered ? AccentPaleColor : PanelColor);
-                    foreground = AccentColor;
+                    background = pressed ? AccentDarkColor : AccentColor;
+                    foreground = DesktopTheme.OnAccent;
                 }
                 else
                 {
                     background = pressed ? AccentPaleColor :
-                        (hovered ? AccentPaleColor : PanelColor);
+                        UiMotion.Blend(PanelColor, AccentPaleColor, hoverMotion.Value);
                     foreground = AccentDarkColor;
                 }
 
-                using (GraphicsPath path = RoundedRectangle(bounds, 6))
+                using (GraphicsPath path = RoundedRectangle(bounds, Math.Max(6, DeviceDpi * 6 / 96)))
                 using (SolidBrush fill = new SolidBrush(background))
                 using (Pen border = new Pen(Accent ? background : BorderColor, 1F))
                 {
@@ -2266,9 +2241,21 @@ namespace AirStereo.Ui
                     }
                     else if (glyph == Glyph.Refresh)
                     {
-                        graphics.DrawArc(pen, bounds.X + 2, bounds.Y + 2, 12, 12, 35, 275);
-                        graphics.DrawLine(pen, bounds.X + 12, bounds.Y + 2, bounds.X + 15, bounds.Y + 2);
-                        graphics.DrawLine(pen, bounds.X + 15, bounds.Y + 2, bounds.X + 14, bounds.Y + 5);
+                        pen.Width = 1.65F;
+                        pen.LineJoin = LineJoin.Round;
+                        graphics.DrawArc(pen, 3, 3, 10, 10, 215, 130);
+                        graphics.DrawArc(pen, 3, 3, 10, 10, 35, 130);
+                        foreach (double degrees in new[] { 345.0, 165.0 })
+                        {
+                            double angle = degrees * Math.PI / 180;
+                            float x = 8 + (float)Math.Cos(angle) * 5;
+                            float y = 8 + (float)Math.Sin(angle) * 5;
+                            float tx = -(float)Math.Sin(angle), ty = (float)Math.Cos(angle);
+                            graphics.DrawLines(pen, new[] {
+                                new PointF(x - tx * 2.5F + ty * 2.2F, y - ty * 2.5F - tx * 2.2F),
+                                new PointF(x, y),
+                                new PointF(x - tx * 2.5F - ty * 2.2F, y - ty * 2.5F + tx * 2.2F) });
+                        }
                     }
                     else if (glyph == Glyph.Settings)
                     {

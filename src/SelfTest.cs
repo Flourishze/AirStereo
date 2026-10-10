@@ -163,6 +163,56 @@ namespace AirStereo
 
         private static void AlacRoundTripAndContinuity()
         {
+            foreach (int rate in new[] { 44100, 48000 })
+            {
+                Exception sequentialError = null;
+                try
+                {
+                    for (int round = 0; round < 100; round++)
+                    using (var left = new NativeAlacEncoder(rate))
+                    using (var right = new NativeAlacEncoder(rate))
+                    {
+                        foreach (NativeAlacEncoder encoder in new[] { left, right })
+                        {
+                            int status = NativeAlacEncoder.ParseMagicCookie(encoder.MagicCookie,
+                                encoder.MagicCookie.Length, out int sr, out int ch, out int bits, out int frames);
+                            if (status != 0 || encoder.MagicCookie.Length != 24 || sr != rate ||
+                                ch != 2 || bits != 16 || frames != 352 || encoder.Encode(new byte[1408]) <= 0)
+                                throw new InvalidOperationException("invalid ALAC cookie or encode in cycle " + round);
+                        }
+                    }
+                }
+                catch (Exception error) { sequentialError = error; }
+                Check("ALAC 100 repeated dual-encoder lifecycles " + rate,
+                    sequentialError == null, sequentialError?.ToString());
+
+                Exception concurrentError = null;
+                object errorGate = new object();
+                var workers = new System.Threading.Thread[4];
+                for (int index = 0; index < workers.Length; index++)
+                {
+                    workers[index] = new System.Threading.Thread(() =>
+                    {
+                        try
+                        {
+                            for (int cycle = 0; cycle < 100; cycle++)
+                            using (var encoder = new NativeAlacEncoder(rate))
+                            {
+                                int status = NativeAlacEncoder.ParseMagicCookie(encoder.MagicCookie,
+                                    encoder.MagicCookie.Length, out int sr, out int ch, out int bits, out int frames);
+                                if (status != 0 || encoder.MagicCookie.Length != 24 || sr != rate ||
+                                    ch != 2 || bits != 16 || frames != 352 || encoder.Encode(new byte[1408]) <= 0)
+                                    throw new InvalidOperationException("invalid concurrent ALAC cookie or encode");
+                            }
+                        }
+                        catch (Exception error) { lock (errorGate) concurrentError = error; }
+                    });
+                    workers[index].Start();
+                }
+                foreach (var worker in workers) worker.Join();
+                Check("ALAC four concurrent workers 400 lifecycles " + rate,
+                    concurrentError == null, concurrentError?.ToString());
+            }
             try
             {
                 foreach (int rate in new[] { 44100, 48000 })

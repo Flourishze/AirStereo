@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Runtime.InteropServices;
@@ -6,26 +6,15 @@ using System.Windows.Forms;
 
 namespace AirStereo.Ui
 {
-    internal static class DesktopTheme
+    internal static partial class DesktopTheme
     {
-        internal static readonly Color Canvas = Color.FromArgb(23, 25, 29);
-        internal static readonly Color Surface = Color.FromArgb(35, 38, 44);
-        internal static readonly Color Ink = Color.FromArgb(239, 241, 244);
-        internal static readonly Color Muted = Color.FromArgb(163, 170, 182);
-        internal static readonly Color Accent = Color.FromArgb(149, 190, 255);
-        internal static readonly Color Border = Color.FromArgb(63, 68, 77);
-
         [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
         private static extern int SetWindowTheme(IntPtr window, string theme, string subId);
 
         internal static void ApplyScrollbars(Control control)
         {
-            control.HandleCreated += delegate
-            {
-                try { SetWindowTheme(control.Handle, "DarkMode_Explorer", null); }
-                catch (DllNotFoundException) { }
-                catch (EntryPointNotFoundException) { }
-            };
+            control.HandleCreated += delegate { SetNativeTheme(control); };
+            SetNativeTheme(control);
         }
     }
 
@@ -60,6 +49,7 @@ namespace AirStereo.Ui
             Controls.Add(frame);
             SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
             ApplyDpiLayout();
+            DesktopTheme.Attach(this);
         }
 
         private void ApplyDpiLayout()
@@ -161,7 +151,7 @@ namespace AirStereo.Ui
                 args.Graphics.Clear(hovered ? Color.FromArgb(157, 52, 64) : DesktopTheme.Canvas);
                 float radius = 4 * DeviceDpi / 96F;
                 float x = Width / 2F, y = Height / 2F;
-                using (Pen pen = new Pen(DesktopTheme.Ink, Math.Max(1.3F, DeviceDpi / 80F)))
+                using (Pen pen = new Pen(hovered ? Color.White : DesktopTheme.Ink, Math.Max(1.3F, DeviceDpi / 80F)))
                 {
                     args.Graphics.DrawLine(pen, x - radius, y - radius, x + radius, y + radius);
                     args.Graphics.DrawLine(pen, x + radius, y - radius, x - radius, y + radius);
@@ -172,20 +162,20 @@ namespace AirStereo.Ui
         }
     }
 
-    /// <summary>Dark navigation without the native tab control's light header and frame.</summary>
+    /// <summary>Responsive settings navigation; keeps the existing page indexes and events.</summary>
     internal sealed class SettingsTabs : UserControl
     {
         private readonly List<Control> pages = new List<Control>();
-        private readonly List<Button> buttons = new List<Button>();
-        private readonly TableLayoutPanel navigation;
-        private readonly Panel content;
-        private readonly TableLayoutPanel root;
+        private readonly List<NavButton> buttons = new List<NavButton>();
+        private readonly TableLayoutPanel navigation, root;
+        private readonly Panel content, rail, body;
+        private readonly Label title, pageTitle;
+        private bool layingOut;
         private int selectedIndex = -1;
         internal event EventHandler SelectedIndexChanged;
         internal int PageCount => pages.Count;
         internal Control PageAt(int index) => pages[index];
         internal Control Navigation => navigation;
-
         internal int SelectedIndex
         {
             get => selectedIndex;
@@ -193,102 +183,144 @@ namespace AirStereo.Ui
             {
                 if (value < 0 || value >= pages.Count) throw new ArgumentOutOfRangeException(nameof(value));
                 if (selectedIndex == value) return;
-                content.SuspendLayout();
                 selectedIndex = value;
-                for (int i = 0; i < buttons.Count; i++)
-                {
-                    pages[i].Visible = i == value;
-                    buttons[i].BackColor = i == value ? DesktopTheme.Surface : DesktopTheme.Canvas;
-                    buttons[i].ForeColor = i == value ? DesktopTheme.Accent : DesktopTheme.Muted;
-                }
+                for (int i = 0; i < pages.Count; i++) pages[i].Visible = i == value;
                 pages[value].BringToFront();
-                content.ResumeLayout(true);
+                pageTitle.Text = value < 2 ? buttons[value].Text + "设置" : buttons[value].Text;
+                RefreshTheme();
                 SelectedIndexChanged?.Invoke(this, EventArgs.Empty);
             }
         }
-
         internal SettingsTabs()
         {
-            // The parent settings form uses an explicit DPI layout.  Inherit would
-            // run another automatic scale pass over the already-sized pages when a
-            // high-DPI monitor creates the handle, which is the source of the
-            // compressed/clipped settings screenshots at 175% and 200%.
             AutoScaleMode = AutoScaleMode.None;
-            BackColor = DesktopTheme.Canvas;
-            ForeColor = DesktopTheme.Ink;
-            Dock = DockStyle.Fill;
-            SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true);
-            root = new TableLayoutPanel { Dock = DockStyle.Fill, Margin = new Padding(0),
-                ColumnCount = 1, RowCount = 2, BackColor = DesktopTheme.Canvas };
-            root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
-            root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            navigation = new TableLayoutPanel { Dock = DockStyle.Fill, Margin = new Padding(0),
-                Padding = new Padding(10, 5, 10, 0), RowCount = 1, BackColor = DesktopTheme.Canvas };
-            navigation.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            BackColor = DesktopTheme.Canvas; ForeColor = DesktopTheme.Ink; Dock = DockStyle.Fill;
+            root = new TableLayoutPanel { Dock = DockStyle.Fill, Margin = new Padding(0), BackColor = DesktopTheme.Canvas };
+            rail = new Panel { Dock = DockStyle.Fill, Margin = new Padding(0), BackColor = DesktopTheme.Canvas };
+            navigation = new TableLayoutPanel { Dock = DockStyle.Fill, Margin = new Padding(0), BackColor = DesktopTheme.Canvas };
+            title = new SettingsHeading { Text = "设置", Dock = DockStyle.Top, TextAlign = ContentAlignment.MiddleLeft,
+                ForeColor = DesktopTheme.Ink, BackColor = DesktopTheme.Canvas };
+            rail.Controls.Add(navigation); rail.Controls.Add(title);
+            body = new Panel { Dock = DockStyle.Fill, Margin = new Padding(0), BackColor = DesktopTheme.Canvas };
             content = new Panel { Dock = DockStyle.Fill, Margin = new Padding(0), BackColor = DesktopTheme.Canvas };
-            root.Controls.Add(navigation, 0, 0);
-            root.Controls.Add(content, 0, 1);
-            Controls.Add(root);
+            pageTitle = new SettingsHeading { Dock = DockStyle.Top, TextAlign = ContentAlignment.MiddleLeft,
+                Padding = new Padding(14,0,0,0), ForeColor = DesktopTheme.Ink, BackColor = DesktopTheme.Canvas };
+            body.Controls.Add(content); body.Controls.Add(pageTitle);
+            root.Controls.Add(rail); root.Controls.Add(body); Controls.Add(root);
             ApplyDpiLayout();
         }
-
         private void ApplyDpiLayout()
         {
-            int dpi = Math.Max(96, DeviceDpi);
-            int pixels(int value) => Math.Max(1, (int)Math.Round(value * dpi / 96.0));
-            root.RowStyles[0].Height = Math.Max(pixels(42), Font.Height + pixels(16));
-            navigation.Padding = new Padding(pixels(10), pixels(5), pixels(10), 0);
-            foreach (Button button in buttons)
-                button.MinimumSize = new Size(0, Math.Max(pixels(32), Font.Height + pixels(12)));
-            root.PerformLayout();
+            if (root == null || layingOut) return;
+            layingOut = true;
+            try
+            {
+                int P(int n) => Math.Max(1, (int)Math.Round(n * Math.Max(96, DeviceDpi) / 96.0));
+                int text = Math.Max(Font.Height, P(16));
+                bool wide = Width >= Math.Max(P(880), text * 42);
+                root.SuspendLayout(); navigation.SuspendLayout();
+                root.Padding = new Padding(P(14), 0, P(10), P(10));
+                root.ColumnStyles.Clear(); root.RowStyles.Clear();
+                root.ColumnCount = wide ? 2 : 1; root.RowCount = wide ? 1 : 2;
+                root.ColumnStyles.Add(new ColumnStyle(wide ? SizeType.Absolute : SizeType.Percent, wide ? Math.Max(P(172), text * 9) : 100));
+                if (wide) root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+                root.RowStyles.Add(new RowStyle(wide ? SizeType.Percent : SizeType.Absolute, wide ? 100 : text * 2 + P(32)));
+                if (!wide) root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+                root.SetCellPosition(rail, new TableLayoutPanelCellPosition(0,0));
+                root.SetCellPosition(body, new TableLayoutPanelCellPosition(wide ? 1 : 0,wide ? 0 : 1));
+                title.Height = wide ? text * 3 : 0; title.Visible = wide;
+                pageTitle.Height = text * 2 + P(10);
+                navigation.Padding = new Padding(0, P(8), wide ? P(10) : 0, 0);
+                navigation.ColumnStyles.Clear(); navigation.RowStyles.Clear();
+                int count = Math.Max(1, buttons.Count);
+                navigation.ColumnCount = wide ? 1 : count;
+                navigation.RowCount = wide ? count + 1 : 1;
+                if (wide)
+                {
+                    navigation.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+                    for (int i=0;i<count;i++) navigation.RowStyles.Add(new RowStyle(SizeType.Absolute,text + P(30)));
+                    navigation.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+                }
+                else
+                {
+                    for (int i=0;i<count;i++) navigation.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100F/count));
+                    navigation.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+                }
+                for (int i=0;i<buttons.Count;i++)
+                {
+                    buttons[i].MinimumSize = Size.Empty;
+                    navigation.SetCellPosition(buttons[i],new TableLayoutPanelCellPosition(wide ? 0 : i,wide ? i : 0));
+                }
+                navigation.ResumeLayout(true); root.ResumeLayout(true);
+            }
+            finally { layingOut = false; }
         }
-
-        protected override void OnFontChanged(EventArgs args)
+        protected override void OnFontChanged(EventArgs e) { base.OnFontChanged(e); ApplyDpiLayout(); }
+        protected override void OnSizeChanged(EventArgs e) { base.OnSizeChanged(e); ApplyDpiLayout(); }
+        protected override void OnDpiChangedAfterParent(EventArgs e) { base.OnDpiChangedAfterParent(e); ApplyDpiLayout(); }
+        internal void RefreshTheme()
         {
-            base.OnFontChanged(args);
-            ApplyDpiLayout();
+            for (int i=0;i<buttons.Count;i++) { buttons[i].Selected = i == selectedIndex; buttons[i].Invalidate(); }
         }
-
         internal void AddPage(string name, Control page)
         {
             int index = pages.Count;
-            pages.Add(page);
-            page.Dock = DockStyle.Fill;
-            page.Margin = new Padding(0);
-            page.BackColor = DesktopTheme.Canvas;
-            page.ForeColor = DesktopTheme.Ink;
-            page.Visible = index == selectedIndex;
+            pages.Add(page); page.Dock = DockStyle.Fill; page.Margin = new Padding(0);
+            page.BackColor = DesktopTheme.Canvas; page.ForeColor = DesktopTheme.Ink; page.Visible = false;
             content.Controls.Add(page);
-            Button button = new Button { Text = name, Dock = DockStyle.Fill, Margin = new Padding(0),
-                FlatStyle = FlatStyle.Flat, UseVisualStyleBackColor = false, ForeColor = DesktopTheme.Muted,
-                BackColor = DesktopTheme.Canvas, AccessibleRole = AccessibleRole.PageTab, AccessibleName = name };
-            button.FlatAppearance.BorderSize = 0;
-            button.FlatAppearance.MouseOverBackColor = DesktopTheme.Surface;
-            button.FlatAppearance.MouseDownBackColor = DesktopTheme.Border;
+            NavButton button = new NavButton { Text = name, Dock = DockStyle.Fill, Margin = new Padding(0,0,0,6),
+                AccessibleRole = AccessibleRole.PageTab, AccessibleName = name };
             button.Click += delegate { SelectedIndex = index; };
-            button.KeyDown += delegate (object sender, KeyEventArgs args)
+            button.KeyDown += delegate(object sender, KeyEventArgs e)
             {
-                if (args.KeyCode != Keys.Left && args.KeyCode != Keys.Right) return;
-                SelectedIndex = (selectedIndex + (args.KeyCode == Keys.Left ? pages.Count - 1 : 1)) % pages.Count;
-                buttons[selectedIndex].Focus();
-                args.Handled = true;
+                if (e.KeyCode != Keys.Left && e.KeyCode != Keys.Right && e.KeyCode != Keys.Up && e.KeyCode != Keys.Down) return;
+                bool back = e.KeyCode == Keys.Left || e.KeyCode == Keys.Up;
+                SelectedIndex = (selectedIndex + (back ? pages.Count-1 : 1)) % pages.Count;
+                buttons[selectedIndex].Focus(); e.Handled = true;
             };
-            buttons.Add(button);
-            navigation.ColumnCount = buttons.Count;
-            navigation.ColumnStyles.Clear();
-            for (int i = 0; i < buttons.Count; i++) navigation.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F / buttons.Count));
-            navigation.Controls.Add(button, index, 0);
+            buttons.Add(button); navigation.Controls.Add(button); ApplyDpiLayout();
             if (selectedIndex < 0) SelectedIndex = 0;
         }
-
-        protected override void Dispose(bool disposing)
+        internal void AddShortcut(string name, Action action)
         {
-            if (disposing)
+            NavButton button = new NavButton { Text = name, Dock = DockStyle.Fill, Margin = new Padding(0,0,0,6),
+                AccessibleName = name, AccessibleRole = AccessibleRole.PushButton };
+            button.Click += delegate { action(); };
+            buttons.Add(button); navigation.Controls.Add(button); ApplyDpiLayout();
+        }
+        private sealed class NavButton : Button
+        {
+            private readonly UiMotion motion;
+            private bool selected;
+            internal bool Selected
             {
-                foreach (Control page in pages) page.Dispose();
+                get => selected;
+                set { selected = value; motion?.To(selected || hovered ? 1 : 0); Invalidate(); }
             }
-            base.Dispose(disposing);
+            private bool hovered;
+            internal NavButton()
+            {
+                motion = new UiMotion(this);
+                FlatStyle = FlatStyle.Flat; FlatAppearance.BorderSize = 0; UseVisualStyleBackColor = false;
+                BackColor = DesktopTheme.Canvas; ForeColor = DesktopTheme.Ink;
+                SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
+            }
+            protected override void OnMouseEnter(EventArgs e) { hovered=true; motion.To(1); base.OnMouseEnter(e); }
+            protected override void OnMouseLeave(EventArgs e) { hovered=false; motion.To(Selected ? 1 : 0); base.OnMouseLeave(e); }
+            protected override void OnPaint(PaintEventArgs e)
+            {
+                var g=e.Graphics; g.Clear(DesktopTheme.Canvas); g.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                if (Width<2 || Height<2) return;
+                if (motion.Value > 0)
+                    using (var path=SettingsDrawing.Rounded(new Rectangle(0,0,Width-1,Height-1),8))
+                    using (var fill=new SolidBrush(UiMotion.Blend(DesktopTheme.Canvas, DesktopTheme.Surface, motion.Value))) g.FillPath(fill,path);
+                if (Selected)
+                    using (var pen=new Pen(DesktopTheme.Accent,Math.Max(3,DeviceDpi*3/96)))
+                    { pen.StartCap=pen.EndCap=System.Drawing.Drawing2D.LineCap.Round; g.DrawLine(pen,5,Height*.32F,5,Height*.68F); }
+                TextRenderer.DrawText(g,Text,Font,new Rectangle(16,0,Math.Max(1,Width-20),Height),DesktopTheme.Ink,
+                    TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+                if (Focused && ShowFocusCues) ControlPaint.DrawFocusRectangle(g,new Rectangle(2,2,Width-5,Height-5),DesktopTheme.Ink,DesktopTheme.Surface);
+            }
         }
     }
 }

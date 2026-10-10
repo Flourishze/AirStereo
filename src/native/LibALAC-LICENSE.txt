@@ -6,8 +6,9 @@ Copyright 2017 GiteKat / LibALAC contributors.
 
 LibALAC is a DLL build and .NET-facing distribution of Apple ALAC encoder and
 decoder sources originally published at alac.macosforge.org. The native DLL
-included with AirStereo is used only for the experimental 1.0.5 ALAC audio
-path. This notice is retained with the binary; see the Apache License 2.0 text
+included with AirStereo implements its ALAC audio path. AirStereo 1.0.6
+initializes magic-cookie buffer capacity; the modified source and provenance
+are supplied in src/native/libalac/. This notice is retained with the binary; see the Apache License 2.0 text
 below for the applicable license terms.
 
 Licensed under the Apache License, Version 2.0 (the "License");

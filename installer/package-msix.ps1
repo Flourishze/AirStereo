@@ -1,9 +1,9 @@
-[CmdletBinding(DefaultParameterSetName = 'Store')]
+﻿[CmdletBinding(DefaultParameterSetName = 'Store')]
 param(
     [Parameter(Mandatory, ParameterSetName = 'Store')][string]$IdentityFile,
     [Parameter(Mandatory, ParameterSetName = 'Local')][switch]$LocalValidation,
-    [string]$OutputDirectory = 'packages\msix-1.0.5',
-    [string]$Version = '1.0.5',
+    [string]$OutputDirectory = 'packages\msix-1.0.6',
+    [string]$Version = '1.0.6',
     [string]$MinimumWindowsVersion = '10.0.19045.0'
 )
 $ErrorActionPreference = 'Stop'
@@ -110,28 +110,24 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Startup launcher linking failed.' }
 } finally { $env:INCLUDE = $previousInclude; $env:LIB = $previousLib }
 
-# Reuse the existing brand icon, render at each actual pixel size (not a renamed ICO).
+# Use the maintained application artwork for Store assets as well.
 Add-Type -AssemblyName System.Drawing
 $assets = Join-Path $payload 'Assets'
 New-Item -ItemType Directory -Path $assets | Out-Null
+$logoPath = Join-Path $root 'assets/icons/AirStereo.png'
+if (-not (Test-Path -LiteralPath $logoPath)) { throw 'Application icon artwork is missing.' }
 function SaveLogo([int]$size, [string]$name) {
+    $source = [Drawing.Image]::FromFile($logoPath)
     $bitmap = [Drawing.Bitmap]::new($size, $size)
     $graphics = [Drawing.Graphics]::FromImage($bitmap)
-    $fill = [Drawing.SolidBrush]::new([Drawing.Color]::FromArgb(19, 142, 148))
-    $pen = [Drawing.Pen]::new([Drawing.Color]::White, [single](4 * $size / 64))
     try {
-        $graphics.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
         $graphics.Clear([Drawing.Color]::Transparent)
-        $scale = [single]($size / 64)
-        $graphics.ScaleTransform($scale, $scale)
-        $pen.Width = 4
-        $graphics.FillEllipse($fill, 2, 2, 60, 60)
-        $points = [Drawing.PointF[]]@([Drawing.PointF]::new(16,38), [Drawing.PointF]::new(22,38),
-            [Drawing.PointF]::new(28,24), [Drawing.PointF]::new(36,46),
-            [Drawing.PointF]::new(44,18), [Drawing.PointF]::new(50,38))
-        $graphics.DrawLines($pen, $points)
+        $graphics.CompositingQuality = [Drawing.Drawing2D.CompositingQuality]::HighQuality
+        $graphics.InterpolationMode = [Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+        $graphics.PixelOffsetMode = [Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+        $graphics.DrawImage($source, [Drawing.Rectangle]::new(0,0,$size,$size))
         $bitmap.Save((Join-Path $assets $name), [Drawing.Imaging.ImageFormat]::Png)
-    } finally { $pen.Dispose(); $fill.Dispose(); $graphics.Dispose(); $bitmap.Dispose() }
+    } finally { $graphics.Dispose(); $bitmap.Dispose(); $source.Dispose() }
 }
 SaveLogo 50 'StoreLogo.png'
 SaveLogo 44 'Square44x44Logo.png'

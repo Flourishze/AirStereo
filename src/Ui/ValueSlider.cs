@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -31,6 +31,8 @@ namespace AirStereo.Ui
         public int Maximum { get => maximum; set { maximum = value; Value = this.value; Invalidate(); } }
         public int SmallChange { get; set; } = 1;
         public int LargeChange { get; set; } = 10;
+        public Orientation Orientation { get; set; } = Orientation.Horizontal;
+        public int TickFrequency { get; set; }
         public int Value
         {
             get => value;
@@ -56,10 +58,12 @@ namespace AirStereo.Ui
         }
 
         private int Radius => Math.Max(5, (int)Math.Round(6 * DeviceDpi / 96.0));
-        private void SetFromPointer(int x)
+        private void SetFromPointer(int x, int y)
         {
             int inset = Radius + 3;
-            double position = (x - inset) / (double)Math.Max(1, Width - inset * 2);
+            double position = Orientation == Orientation.Vertical
+                ? 1 - (y - inset) / (double)Math.Max(1, Height - inset * 2)
+                : (x - inset) / (double)Math.Max(1, Width - inset * 2);
             Value = minimum + (int)Math.Round(Math.Max(0, Math.Min(1, position)) * (maximum - minimum));
         }
 
@@ -69,13 +73,13 @@ namespace AirStereo.Ui
             if (InputLocked || args.Button != MouseButtons.Left) return;
             Focus();
             Capture = true;
-            SetFromPointer(args.X);
+            SetFromPointer(args.X, args.Y);
         }
 
         protected override void OnMouseMove(MouseEventArgs args)
         {
             base.OnMouseMove(args);
-            if (!InputLocked && Capture && args.Button == MouseButtons.Left) SetFromPointer(args.X);
+            if (!InputLocked && Capture && args.Button == MouseButtons.Left) SetFromPointer(args.X, args.Y);
         }
 
         protected override void OnMouseUp(MouseEventArgs args)
@@ -121,6 +125,12 @@ namespace AirStereo.Ui
             base.OnPaint(args);
             Graphics graphics = args.Graphics;
             graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            if (Orientation == Orientation.Vertical)
+            {
+                DrawVertical(graphics);
+                DrawFocus(graphics);
+                return;
+            }
             int inset = Radius + 3;
             int y = Height / 2;
             int end = Math.Max(inset, Width - inset);
@@ -129,9 +139,9 @@ namespace AirStereo.Ui
             // and thumb for that state, but do not set Enabled=false: WinForms would
             // also darken surrounding text on some Windows themes.
             Color accent = !Enabled || InputLocked
-                ? Color.FromArgb(100, 107, 119)
-                : Color.FromArgb(119, 169, 247);
-            using (Pen rail = new Pen(Color.FromArgb(97, 103, 113), Math.Max(2, DeviceDpi / 32F)))
+                ? DesktopTheme.Disabled
+                : DesktopTheme.StrongAccent;
+            using (Pen rail = new Pen(DesktopTheme.Disabled, Math.Max(2, DeviceDpi / 32F)))
             using (Pen fill = new Pen(accent, rail.Width))
             using (SolidBrush knob = new SolidBrush(accent))
             {
@@ -139,10 +149,48 @@ namespace AirStereo.Ui
                 fill.StartCap = fill.EndCap = LineCap.Round;
                 graphics.DrawLine(rail, inset, y, end, y);
                 if (thumb > inset) graphics.DrawLine(fill, inset, y, thumb, y);
-                graphics.FillEllipse(knob, thumb - Radius, y - Radius, Radius * 2, Radius * 2);
+                DrawThumb(graphics, thumb, y, accent);
             }
+            DrawFocus(graphics);
+        }
+
+        private void DrawVertical(Graphics graphics)
+        {
+            int inset = Radius + 3, end = Math.Max(inset, Height - inset), x = Width / 2;
+            int thumb = end - (int)Math.Round((end - inset) * (value - minimum) / (double)Math.Max(1, maximum - minimum));
+            Color accent = !Enabled || InputLocked ? DesktopTheme.Disabled : DesktopTheme.StrongAccent;
+            using (Pen rail = new Pen(DesktopTheme.Disabled, Math.Max(2, DeviceDpi / 32F)))
+            using (Pen fill = new Pen(accent, rail.Width))
+            {
+                rail.StartCap = rail.EndCap = fill.StartCap = fill.EndCap = LineCap.Round;
+                graphics.DrawLine(rail, x, inset, x, end);
+                if (TickFrequency > 0)
+                    for (int tick = minimum; tick <= maximum; tick += TickFrequency)
+                    {
+                        int y = end - (int)Math.Round((end - inset) * (tick - minimum) / (double)Math.Max(1, maximum - minimum));
+                        graphics.DrawLine(rail, x + Radius + 6, y, x + Radius + 7, y);
+                    }
+                if (thumb < end) graphics.DrawLine(fill, x, thumb, x, end);
+                DrawThumb(graphics, x, thumb, accent);
+            }
+        }
+
+        private void DrawThumb(Graphics graphics, int x, int y, Color accent)
+        {
+            using (SolidBrush ring = new SolidBrush(DesktopTheme.Surface))
+            using (Pen border = new Pen(DesktopTheme.Border))
+            using (SolidBrush fill = new SolidBrush(accent))
+            {
+                graphics.FillEllipse(ring, x - Radius - 2, y - Radius - 2, Radius * 2 + 4, Radius * 2 + 4);
+                graphics.DrawEllipse(border, x - Radius - 2, y - Radius - 2, Radius * 2 + 4, Radius * 2 + 4);
+                graphics.FillEllipse(fill, x - Radius + 1, y - Radius + 1, Radius * 2 - 2, Radius * 2 - 2);
+            }
+        }
+
+        private void DrawFocus(Graphics graphics)
+        {
             if (Focused && ShowFocusCues)
-                using (Pen focus = new Pen(accent) { DashStyle = DashStyle.Dot })
+                using (Pen focus = new Pen(DesktopTheme.Accent) { DashStyle = DashStyle.Dot })
                     graphics.DrawRectangle(focus, 1, 1, Math.Max(0, Width - 3), Math.Max(0, Height - 3));
         }
 

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Diagnostics;
@@ -20,6 +20,20 @@ namespace AirStereo.Ui
         private readonly Dictionary<string, DateTime> recentFaults = new Dictionary<string, DateTime>();
         private readonly List<FaultEntry> visibleFaults = new List<FaultEntry>();
 
+        internal static bool ShouldRecordPlaybackWarning(string message)
+        {
+            if (string.IsNullOrEmpty(message)) return false;
+            // An EOF on the auxiliary event socket alone does not establish media failure.
+            // Keep the original line in PlaybackLog; feedback and playback failures still report.
+            if (message.StartsWith("event channel closed:", StringComparison.OrdinalIgnoreCase) &&
+                message.EndsWith(": receiver closed the control connection", StringComparison.OrdinalIgnoreCase))
+                return false;
+            return message.StartsWith("warning:", StringComparison.OrdinalIgnoreCase) ||
+                message.StartsWith("PTP unavailable", StringComparison.OrdinalIgnoreCase) ||
+                message.Contains("event channel closed:", StringComparison.OrdinalIgnoreCase);
+        }
+
+
         private Control BuildGeneralPage()
         {
             Panel page = new Panel { BackColor = CanvasColor, ForeColor = InkColor, Padding = new Padding(14),
@@ -32,10 +46,10 @@ namespace AirStereo.Ui
             grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             grid.RowCount = 5;
             grid.RowStyles.Clear();
-            for (int i = 0; i < 4; i++) grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
-            grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            startupBox = new CheckBox { Text = "登录 Windows 后自动启动", Dock = DockStyle.Fill,
-                ForeColor = InkColor, AccessibleName = "开机自启", AutoEllipsis = true };
+            for (int i = 0; i < 5; i++) grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 100));
+            startupBox = new SettingsSwitch { Text = "登录 Windows 后自动启动",
+                Description = "启动 AirStereo 并收在托盘中，不打断当前工作。", Dock = DockStyle.Fill,
+                ForeColor = InkColor, AccessibleName = "开机自启" };
             startupBox.CheckedChanged += async delegate
             {
                 if (startupSyncing || OfflinePreview) return;
@@ -50,16 +64,23 @@ namespace AirStereo.Ui
                 }
                 finally { await RefreshStartupAsync(); }
             };
-            grid.Controls.Add(startupBox, 0, 0);
-            grid.Controls.Add(new Label { Text = ".NET " + Environment.Version + " · " +
-                System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
-                Dock = DockStyle.Fill, ForeColor = MutedColor, AutoEllipsis = true }, 0, 1);
-            grid.Controls.Add(BuildUpdatePanel(), 0, 2);
+            grid.Controls.Add(new SettingsCard(startupBox), 0, 0);
+            grid.Controls.Add(new SettingsCard(BuildAppearanceOptions()), 0, 1);
+            grid.Controls.Add(new SettingsCard(BuildAutoConnectOptions()), 0, 2);
+            generalUpdateContent = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1,
+                RowCount = 2, Margin = new Padding(0) };
+            generalUpdateContent.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            generalUpdateContent.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
+            generalUpdateContent.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            generalUpdateContent.Controls.Add(BuildUpdatePanel(), 0, 0);
             updateStatus = new Label { Text = PackageEnvironment.IsPackaged ?
                 "MSIX 版由 Microsoft Store 管理更新" : "更新来源：Flourishze/AirStereo 正式 Release", Dock = DockStyle.Fill,
-                ForeColor = MutedColor, AutoEllipsis = true };
-            grid.Controls.Add(updateStatus, 0, 3);
-            grid.Controls.Add(BuildAutoConnectOptions(), 0, 4);
+                ForeColor = MutedColor, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft };
+            generalUpdateContent.Controls.Add(updateStatus, 0, 1);
+            grid.Controls.Add(new SettingsCard(generalUpdateContent), 0, 3);
+            grid.Controls.Add(new Label { Text = "AirStereo " + VersionInfo.Current + "  ·  .NET " + Environment.Version + "  ·  " +
+                System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
+                Dock = DockStyle.Fill, ForeColor = MutedColor, TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true }, 0, 4);
             page.Controls.Add(grid);
             return page;
         }

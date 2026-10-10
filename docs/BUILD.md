@@ -15,12 +15,12 @@ Windows x64；PowerShell；Visual Studio 18 Build Tools 的 Roslyn 和 C++ 工�
 ## 打包
 
 ```powershell
-.\installer\package-release.ps1 -BuildDirectory out\program -OutputDirectory out\release-1.0.5 -BuildId 1.0.5
+.\installer\package-release.ps1 -BuildDirectory out\program -OutputDirectory out\release-1.0.6 -BuildId 1.0.6
 ```
 
 要求 Visual Studio 安装的 Mono.Cecil、匹配运行时及 `installer/template/AirStereo-Setup-base.exe`。输出目录不得含既有安装包或 payload，以免覆盖历史产物。脚本保留 .NET 运行时的许可文件。打包不会自动上传 GitHub。
 
-应用版本在 `src/VersionInfo.cs`；发布时同时维护安装版本、README、CHANGELOG、发布说明及 `v1.0.5` 标签。输出安装包应先验收再发布。
+应用版本在 `src/VersionInfo.cs`；发布时同时维护安装版本、README、CHANGELOG、发布说明及 `v1.0.6` 标签。输出安装包应先验收再发布。
 
 ## 可重建范围
 
@@ -35,8 +35,8 @@ Windows x64；PowerShell；Visual Studio 18 Build Tools 的 Roslyn 和 C++ 工�
 MSI 默认使用项目既有 WiX 4.0.6，或通过 -WixExe 指定已获得使用许可的工具路径；UpgradeCode 保持不变。
 
 ```powershell
-.\installer\package-msi.ps1 -PayloadDirectory out\release-1.0.5\payload -OutputDirectory out\release-1.0.5 -Version 1.0.5 -WixExe tools\wix\wix.exe
-.\installer\package-msix.ps1 -IdentityFile .\store-identity.json -OutputDirectory out\msix-1.0.5 -Version 1.0.5
+.\installer\package-msi.ps1 -PayloadDirectory out\release-1.0.6\payload -OutputDirectory out\release-1.0.6 -Version 1.0.6 -WixExe tools\wix\wix.exe
+.\installer\package-msix.ps1 -IdentityFile .\store-identity.json -OutputDirectory out\msix-1.0.6 -Version 1.0.6
 ```
 
 商店身份从合作伙伴中心复制到本地 JSON，不将个人证书、凭据或身份配置文件纳入源码包。MSIX 构建会保留应用身份、打包 Windows 启动任务桥接库，并生成资源索引、解包校验和哈希。详见 [MSIX 说明](MSIX.md)。
@@ -45,3 +45,9 @@ MSI 默认使用项目既有 WiX 4.0.6，或通过 -WixExe 指定已获得使用
 
 
 
+
+## 图标与 ALAC 原生依赖
+
+图标资源位于 assets/icons，SVG 原稿与各尺寸 ICO/PNG 一同提供。修改图标后，可使用 Python 与 Pillow 执行 tools/generate-icons.py；普通构建使用已有资源，无需 Python。
+
+本版本保留 ALAC 初始化容量修复的源码与二进制；需要重新编译时先执行 installer/build-alac.ps1，再执行 build.ps1。上游出处、提交和修改范围见 src/native/libalac/AIRSTEREO_PATCH.md；Apache-2.0 许可随包保留。

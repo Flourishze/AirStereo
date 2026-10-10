@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$BuildDirectory,
     [Parameter(Mandatory = $true)][string]$OutputDirectory,
@@ -86,23 +86,10 @@ try {
     foreach ($licenseName in @('LICENSE', 'README.md', 'README.en.md')) {
         Copy-Item -LiteralPath (Join-Path $root $licenseName) -Destination (Join-Path $payload ('AirStereo-' + $licenseName))
     }
-    # Avoid a PowerShell here-string here: on some localized PowerShell hosts the
-    # UTF-8 script is tokenized incorrectly when the closing marker follows CJK
-    # text.  Joining ordinary interpolated lines produces the same release notes.
-    $notes = @(
-        "AirStereo 正式版本 $BuildId（Windows x64）"
-        ""
-        "包含：托盘弹出设备列表、深色设置与均衡器背景、开机自启、故障记录和打开故障文件夹、勾选设备时窗口不再跳动、主动停止不再误记连接故障、GitHub 手动检查更新。"
-        "内置匹配的 .NET Core / Desktop $($core.version) 运行时，程序优先使用安装目录内的 dotnet.exe。"
-        "保留单设备完整立体声、自选双设备 L/R 与原生配对音频链路，以及 EQ、平衡和测试音。"
-        ""
-        "安装前请从右下角托盘菜单退出旧版。可选择原目录进行覆盖安装。"
-        "本版改进：默认 ALAC 编码与可观测诊断、静音保流、采集饥饿保护、串流时静音本机输出、启动自动连接和诊断日志自动跟随。"
-        "故障记录保存在软件目录 Diagnostics；目录不可写时回退到当前用户的本地应用数据目录。"
-        "可在设置的故障记录页查看，并直接打开实际存储目录。"
-        ""
-        "版本信息以指定仓库 https://github.com/Flourishze/AirStereo 的正式 Release 为准。"
-    ) -join [Environment]::NewLine
+    # Use the same version-specific release notes as the repository.
+    $releaseNotes = Join-Path $root ("docs/releases/v" + $BuildId + ".md")
+    if (-not (Test-Path -LiteralPath $releaseNotes)) { throw 'Matching release notes are required.' }
+    $notes = [IO.File]::ReadAllText($releaseNotes)
     $notes | Set-Content -LiteralPath (Join-Path $payload '发布说明.txt') -Encoding UTF8
     Copy-Item -LiteralPath (Join-Path $payload '发布说明.txt') -Destination (Join-Path $output '发布说明.txt')
     $zip = Join-Path $output 'AirStereoPayload.zip'
