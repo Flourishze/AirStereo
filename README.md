@@ -1,4 +1,4 @@
-# AirStereo
+<img width="1920" height="1080" alt="01-dark-overview" src="https://github.com/user-attachments/assets/d6ef62ba-ef55-4cbf-87cd-f606a6252676" /># AirStereo
 
 [English](README.en.md) · [下载 1.0.7](https://github.com/Flourishze/AirStereo/releases/tag/v1.0.7) · [Microsoft Store](https://apps.microsoft.com/detail/9NMX9H3GBGJ4)
 
@@ -26,6 +26,12 @@ AirStereo 采集默认输出设备的系统混音，适合音乐、视频、游�
 | 本机输出静音 | 串流时可静音电脑，停止后恢复原静音状态 |
 | 诊断日志与故障信息 | 独立设置菜单；可打开故障文件夹；空扫描显示状态，真实网络/播放错误记录故障 |
 | 检查更新 | 独立版检查本仓库正式 Releases；商店版由 Microsoft Store 管理更新 |
+
+## 截图
+<img width="1920" height="1080" alt="01-dark-overview" src="https://github.com/user-attachments/assets/a16a4f38-6ca4-4731-a4ed-339d3d8710cb" />
+<img width="1920" height="1080" alt="02-light-overview" src="https://github.com/user-attachments/assets/d33aa8d9-a90a-4f66-9d01-91fb043f696d" />
+<img width="1<img width="1920" height="1080" alt="03-ten-band-eq" src="https://github.com/user-attachments/assets/fac152c9-46c1-489c-9b20-578e169d71f6" />
+<img width="1920" height="1080" alt="04-startup-reconnect" src="https://github.com/user-attachments/assets/e23e9e89-6fd1-4464-9eda-38f7d615ea56" />
 
 ## 安装
 
