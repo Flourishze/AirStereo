@@ -28,10 +28,11 @@ AirStereo 采集默认输出设备的系统混音，适合音乐、视频、游�
 | 检查更新 | 独立版检查本仓库正式 Releases；商店版由 Microsoft Store 管理更新 |
 
 ## 截图
-<img width="1920" height="1080" alt="01-dark-overview" src="https://github.com/user-attachments/assets/a16a4f38-6ca4-4731-a4ed-339d3d8710cb" />
-<img width="1920" height="1080" alt="02-light-overview" src="https://github.com/user-attachments/assets/d33aa8d9-a90a-4f66-9d01-91fb043f696d" />
-<img width="1<img width="1920" height="1080" alt="03-ten-band-eq" src="https://github.com/user-attachments/assets/fac152c9-46c1-489c-9b20-578e169d71f6" />
-<img width="1920" height="1080" alt="04-startup-reconnect" src="https://github.com/user-attachments/assets/e23e9e89-6fd1-4464-9eda-38f7d615ea56" />
+<img width="1920" height="1080" alt="01-dark-overview" src="https://github.com/user-attachments/assets/0f15a2d8-c310-4c9e-b17f-f53f5ade0846" />
+<img width="1920" height="1080" alt="02-light-overview" src="https://github.com/user-attachments/assets/c367f7e5-576a-4418-a91a-1962cbdb89d6" />
+<img width="1920" height="1080" alt="03-ten-band-eq" src="https://github.com/user-attachments/assets/517c45ff-7ed7-4032-a5dd-7333540745d3" />
+<img width="1920" height="1080" alt="04-startup-reconnect" src="https://github.com/user-attachments/assets/1b78a596-05eb-4ce2-bc42-a3b762e24d71" />
+
 
 ## 安装
 
