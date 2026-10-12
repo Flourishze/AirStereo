@@ -27,6 +27,13 @@ AirStereo captures the system mix from the default output device for music, vide
 | Diagnostics and faults | Separate Settings pages and an Open folder action; empty discovery is a status, while actual network/playback errors are recorded |
 | Update checking | Standalone installations check this repository's stable Releases; Store installations use Microsoft Store |
 
+## screenshot
+<img width="1920" height="1080" alt="01-dark-overview" src="https://github.com/user-attachments/assets/2115c7ed-62ff-45c8-98de-2071ba3d29f0" />
+<img width="1920" height="1080" alt="02-light-overview" src="https://github.com/user-attachments/assets/ddae357c-3753-4664-8e75-cc146096256b" />
+<img width="1920" height="1080" alt="03-ten-band-eq" src="https://github.com/user-attachments/assets/37d642dd-cb5e-4c94-9089-fad8fa190765" />
+<img width="1920" height="1080" alt="04-startup-reconnect" src="https://github.com/user-attachments/assets/e37c4d23-773b-47bb-aa69-20b1d0745712" />
+
+
 ## Installation
 
 - **Standalone MSI**: [AirStereo-1.0.7-x64.msi](https://github.com/Flourishze/AirStereo/releases/download/v1.0.7/AirStereo-1.0.7-x64.msi). A Simplified Chinese wizard supports directory selection, upgrades from 1.0.6 and handling a running application.
