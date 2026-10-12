@@ -1,4 +1,4 @@
-<img width="1920" height="1080" alt="01-dark-overview" src="https://github.com/user-attachments/assets/d6ef62ba-ef55-4cbf-87cd-f606a6252676" /># AirStereo
+# AirStereo
 
 [English](README.en.md) · [下载 1.0.7](https://github.com/Flourishze/AirStereo/releases/tag/v1.0.7) · [Microsoft Store](https://apps.microsoft.com/detail/9NMX9H3GBGJ4)
 
