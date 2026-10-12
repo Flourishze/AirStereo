@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -12,6 +12,8 @@ namespace AirStereo.Ui
     {
         private CheckBox muteLocalOutputBox;
         private CheckBox autoConnectBox;
+        private SettingsSwitch autoReconnectBox;
+        private NumericUpDown reconnectAttemptsBox;
         private CheckedListBox autoConnectDeviceList;
         private Label autoConnectHint;
         private readonly List<string> autoConnectIdentities = new List<string>();
@@ -25,6 +27,73 @@ namespace AirStereo.Ui
         private System.Windows.Forms.Timer localMuteTimer;
         private LocalOutputMuteController localMute;
         private bool muteAbandoned;
+
+        private Control BuildPlaybackReconnectOptions()
+        {
+            TableLayoutPanel row = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3,
+                RowCount = 1, Margin = new Padding(0), BackColor = DesktopTheme.Surface };
+            row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 70));
+            row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 15));
+            row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 15));
+
+            autoReconnectBox = new SettingsSwitch
+            {
+                Text = "播放中断后自动重连",
+                Dock = DockStyle.Fill,
+                ForeColor = InkColor,
+                Checked = playbackAutoReconnect,
+                AccessibleName = "播放中断后自动重连"
+            };
+            autoReconnectBox.CheckedChanged += delegate
+            {
+                if (featureSettingsSyncing) return;
+                playbackAutoReconnect = autoReconnectBox.Checked;
+                UpdateReconnectControls();
+                if (!OfflinePreview) SaveSettings();
+            };
+
+            Label attemptsLabel = new Label
+            {
+                Text = "最多次数",
+                AutoSize = false,
+                Dock = DockStyle.Fill,
+                ForeColor = MutedColor,
+                TextAlign = ContentAlignment.MiddleRight,
+                AutoEllipsis = true,
+                Margin = new Padding(4, 0, 6, 0)
+            };
+            reconnectAttemptsBox = new NumericUpDown
+            {
+                Minimum = 0,
+                Maximum = 10,
+                Value = maxPlaybackReconnectAttempts,
+                Dock = DockStyle.Fill,
+                TextAlign = HorizontalAlignment.Center,
+                BackColor = DesktopTheme.Surface,
+                ForeColor = InkColor,
+                AccessibleName = "自动重连最多次数"
+            };
+            reconnectAttemptsBox.ValueChanged += delegate
+            {
+                if (featureSettingsSyncing) return;
+                maxPlaybackReconnectAttempts = (int)reconnectAttemptsBox.Value;
+                if (!OfflinePreview) SaveSettings();
+            };
+
+            row.Controls.Add(autoReconnectBox, 0, 0);
+            row.Controls.Add(attemptsLabel, 1, 0);
+            row.Controls.Add(reconnectAttemptsBox, 2, 0);
+            uiTips.SetToolTip(autoReconnectBox, "达到次数上限后停止。次数填 0 表示关闭自动重连。");
+            uiTips.SetToolTip(reconnectAttemptsBox, "自动重连最多次数，范围 0-10；0 表示关闭自动重连。");
+            UpdateReconnectControls();
+            return row;
+        }
+
+        private void UpdateReconnectControls()
+        {
+            if (reconnectAttemptsBox != null && !reconnectAttemptsBox.IsDisposed)
+                reconnectAttemptsBox.Enabled = playbackAutoReconnect;
+        }
 
         private Control BuildMuteLocalOutput()
         {

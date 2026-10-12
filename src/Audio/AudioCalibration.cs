@@ -10,10 +10,14 @@ namespace AirStereo.Audio
     /// </summary>
     public sealed class AudioProfile
     {
-        public const int BandCount = 5;
+        public const int BandCount = 10;
 
-        private static readonly double[] Frequencies = { 60.0, 230.0, 910.0, 3600.0, 12000.0 };
-        private static readonly double[] Qs = { 0.72, 0.90, 1.00, 0.90, 0.72 };
+        // Standard ten-band peak EQ centers. The highest band remains below the
+        // Nyquist frequency for both supported 44.1 kHz and 48 kHz output.
+        private static readonly double[] Frequencies =
+            { 31.0, 62.0, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0 };
+        private static readonly double[] Qs =
+            { 1.41, 1.41, 1.41, 1.41, 1.41, 1.41, 1.41, 1.41, 1.41, 1.41 };
         private static readonly AudioProfile FlatProfile =
             new AudioProfile(false, new double[BandCount], 0.0, 0.0);
 
@@ -57,6 +61,21 @@ namespace AirStereo.Audio
         public static double Q(int index)
         {
             return index >= 0 && index < BandCount ? Qs[index] : 1.0;
+        }
+
+        /// <summary>
+        /// Maps the former five-band centers (60, 230, 910, 3600 and 12000 Hz)
+        /// onto the nearest ten-band centers (62, 250, 1000, 4000 and 16000 Hz).
+        /// This keeps user EQ settings when upgrading from the five-band layout.
+        /// </summary>
+        public static double[] ExpandLegacyFiveBandGains(double[]? legacyGains)
+        {
+            double[] expanded = new double[BandCount];
+            if (legacyGains == null) return expanded;
+            int[] targetBands = { 1, 3, 5, 7, 9 };
+            for (int i = 0; i < targetBands.Length && i < legacyGains.Length; i++)
+                expanded[targetBands[i]] = legacyGains[i];
+            return expanded;
         }
 
         /// <summary>
@@ -119,7 +138,7 @@ namespace AirStereo.Audio
     }
 
     /// <summary>
-    /// Five peaking filters followed by independent left/right gain. It runs in the same
+    /// Ten peaking filters followed by independent left/right gain. It runs in the same
     /// allocation-free path as the packetizer and only rebuilds coefficients when the
     /// immutable profile object changes.
     /// </summary>

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -112,6 +112,10 @@ namespace AirStereo.Ui
         private string calibrationBands = "";
         private double calibrationLeft;
         private double calibrationRight;
+        private bool playbackAutoReconnect = true;
+        private int maxPlaybackReconnectAttempts = 3;
+
+        private const int PlaybackReconnectDelayMilliseconds = 2000;
 
         public MainForm()
         {
@@ -1487,21 +1491,68 @@ namespace AirStereo.Ui
                 string failure = null;
                 Exception playError = null;
                 PlayResult result = null;
+                bool stoppedByUser = false;
+                bool reconnectAllowed = kind == "loopback" && playbackAutoReconnect && maxPlaybackReconnectAttempts > 0;
+                int reconnectAttempts = 0;
                 try
                 {
-                    result = AirStereoApi.Play(group, request, stopSignal, PlaybackLog);
-                }
-                catch (Exception error)
-                {
-                    failure = error.Message;
-                    playError = error;
+                    while (true)
+                    {
+                        try
+                        {
+                            result = AirStereoApi.Play(group, request, stopSignal, PlaybackLog);
+                            break;
+                        }
+                        catch (Exception error)
+                        {
+                            if (stopSignal.IsSet)
+                            {
+                                stoppedByUser = true;
+                                failure = null;
+                                playError = null;
+                                break;
+                            }
+
+                            failure = error.Message;
+                            playError = error;
+                            if (!reconnectAllowed || reconnectAttempts >= maxPlaybackReconnectAttempts)
+                                break;
+
+                            reconnectAttempts++;
+                            Post(delegate
+                            {
+                                recoveringConnection = true;
+                                streamReady = false;
+                                UpdateLocalMute();
+                                UpdateButtons();
+                                SetStatus("恢复连接…");
+                            });
+                            Log("播放中断：" + error.Message + "；将在 " +
+                                PlaybackReconnectDelayMilliseconds.ToString(CultureInfo.InvariantCulture) +
+                                " 秒后第 " + reconnectAttempts + "/" + maxPlaybackReconnectAttempts + " 次重连");
+
+                            if (stopSignal.Wait(PlaybackReconnectDelayMilliseconds))
+                            {
+                                stoppedByUser = true;
+                                failure = null;
+                                playError = null;
+                                break;
+                            }
+                            // A new AirPlay session and source are created by the next Play call.
+                            // Keep the original group and route intact so a dual-device session
+                            // can never silently fall back to one speaker.
+                            failure = null;
+                            playError = null;
+                        }
+                    }
                 }
                 finally
                 {
                     if (ReferenceEquals(playStop, stopSignal)) playStop = null;
                     if (ReferenceEquals(playWorker, Thread.CurrentThread)) playWorker = null;
                     stopSignal.Dispose();
-                    string message = failure != null
+                    bool failed = failure != null && !stoppedByUser;
+                    string message = failed
                         ? "播放中断：" + failure
                         : "播放结束：" + (result != null ? result.Summary() : "");
                     Post(delegate
@@ -1510,11 +1561,12 @@ namespace AirStereo.Ui
                         livePlayback = null;
                         streamReady = false;
                         UpdateLocalMute();
-                        recoveringConnection = failure != null;
+                        recoveringConnection = false;
                         Log(message);
-                        if (playError != null) RecordFault("播放中断", failure, playError);
+                        if (failed && playError != null)
+                            RecordFault("播放中断", failure, playError);
                         UpdateButtons();
-                        SetStatus(failure != null ? "连接失败 · " + failure : "已停止");
+                        SetStatus(failed ? "连接失败 · " + failure : "已停止");
                     });
                 }
             });
@@ -1765,6 +1817,9 @@ namespace AirStereo.Ui
                     if (key == "realtimeVolume") LoadVolumeModeSetting(value);
                     else if (key == "muteLocalOutput") muteLocalOutputBox.Checked = value == "1";
                     else if (key == "autoConnect") autoConnectBox.Checked = value == "1";
+                    else if (key == "playbackAutoReconnect") playbackAutoReconnect = value == "1";
+                    else if (key == "maxPlaybackReconnectAttempts" && int.TryParse(value, out int reconnects))
+                        maxPlaybackReconnectAttempts = Math.Max(0, Math.Min(10, reconnects));
                     else if (key == "autoConnectDevices")
                     { autoConnectIdentities.Clear(); autoConnectIdentities.AddRange(StartupConnectionPolicy.Decode(value)); }
                     else if (key == "selectedDevices") LoadSelectedDevices(value);
@@ -1824,6 +1879,8 @@ namespace AirStereo.Ui
                 File.WriteAllText(SettingsPath(),
                     "muteLocalOutput=" + (muteLocalOutputBox.Checked ? "1" : "0") + Environment.NewLine +
                     "autoConnect=" + (autoConnectBox.Checked ? "1" : "0") + Environment.NewLine +
+                    "playbackAutoReconnect=" + (playbackAutoReconnect ? "1" : "0") + Environment.NewLine +
+                    "maxPlaybackReconnectAttempts=" + maxPlaybackReconnectAttempts.ToString(CultureInfo.InvariantCulture) + Environment.NewLine +
                     "autoConnectDevices=" + StartupConnectionPolicy.Encode(autoConnectIdentities) + Environment.NewLine +
                     "volume=" + volumeBar.Value.ToString(CultureInfo.InvariantCulture) + Environment.NewLine +
                     VolumeModeSettingsLine() + Environment.NewLine +
@@ -2313,4 +2370,3 @@ namespace AirStereo.Ui
         }
     }
 }
-

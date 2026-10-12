@@ -1,0 +1,72 @@
+<Application x:Class="AirStereo.WinUiApplication"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+      </ResourceDictionary.MergedDictionaries>
+      <Style x:Key="AirStereoPrimaryTextStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />
+        <Setter Property="FontSize" Value="{ThemeResource ControlContentThemeFontSize}" />
+      </Style>
+      <Style x:Key="AirStereoSettingsTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource AirStereoPrimaryTextStyle}">
+        <Setter Property="FontSize" Value="{ThemeResource ControlContentThemeFontSize}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+      </Style>
+      <Style x:Key="AirStereoSectionTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource AirStereoPrimaryTextStyle}">
+        <Setter Property="FontSize" Value="{ThemeResource ControlContentThemeFontSize}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+      </Style>
+      <Style x:Key="AirStereoSecondaryTextStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+        <Setter Property="FontSize" Value="{ThemeResource ControlContentThemeFontSize}" />
+      </Style>
+      <Style x:Key="AirStereoAccentTextStyle" TargetType="TextBlock" BasedOn="{StaticResource AirStereoPrimaryTextStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+      </Style>
+      <Style x:Key="AirStereoIconStyle" TargetType="FontIcon">
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+        <Setter Property="FontSize" Value="{ThemeResource ControlContentThemeFontSize}" />
+      </Style>
+      <Style x:Key="AirStereoAccentIconStyle" TargetType="FontIcon">
+        <Setter Property="Foreground" Value="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+        <Setter Property="FontSize" Value="{ThemeResource ControlContentThemeFontSize}" />
+      </Style>
+      <Style x:Key="AirStereoRoleTextStyle" TargetType="TextBlock" BasedOn="{StaticResource AirStereoPrimaryTextStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+      </Style>
+      <Style x:Key="AirStereoSpeakerIconStyle" TargetType="Border">
+        <Setter Property="Width" Value="32" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="CornerRadius" Value="{ThemeResource ControlCornerRadius}" />
+        <Setter Property="Background" Value="{ThemeResource LayerFillColorAltBrush}" />
+      </Style>
+      <Style x:Key="AirStereoCardStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource LayerFillColorDefaultBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{ThemeResource ControlCornerRadius}" />
+      </Style>
+      <Style x:Key="AirStereoIconButtonStyle" TargetType="Button">
+        <Setter Property="MinWidth" Value="32" />
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="CornerRadius" Value="{ThemeResource ControlCornerRadius}" />
+      </Style>
+      <Style x:Key="AirStereoDeviceCardStyle" TargetType="Border" BasedOn="{StaticResource AirStereoCardStyle}">
+        <Setter Property="Padding" Value="0" />
+      </Style>
+      <Style x:Key="AirStereoSelectedDeviceCardStyle" TargetType="Border" BasedOn="{StaticResource AirStereoDeviceCardStyle}">
+        <Setter Property="Background" Value="{ThemeResource LayerFillColorDefaultBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+      </Style>
+      <Style x:Key="AirStereoOnlineTextStyle" TargetType="TextBlock" BasedOn="{StaticResource AirStereoSecondaryTextStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource SystemFillColorSuccessBrush}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+      </Style>
+    </ResourceDictionary>
+  </Application.Resources>
+</Application>

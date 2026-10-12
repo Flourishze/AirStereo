@@ -1,53 +1,52 @@
-# 构建与打包
+# 构建 AirStereo 1.0.7
 
-## 前置条件
-Windows x64；PowerShell；Visual Studio 18 Build Tools 的 Roslyn 和 C++ 工具链；Windows SDK；.NET Windows Desktop 与 Core 运行时。本次构建使用已安装的匹配运行时（当前环境为 10.0.12）。当前脚本直接引用已安装运行时程序集，不使用 SDK 项目还原。
+当前桌面入口为 `winui3/AirStereo.WinUI.csproj`，使用编译型 XAML。`src/Audio`、`src/Protocol`、`src/Session` 提供共享音频与协议实现；`src/Ui` 中的旧 WinForms 界面保留供历史参考，当前工程只引用共享桌面服务。
 
-## 构建应用
+## 工具
 
-```powershell
-.\build.ps1 -OutputDir out\program
-& .\out\program\AirStereo.exe selftest
-```
+- Windows x64、PowerShell 7、.NET 10 SDK。本版构建使用 SDK 10.0.401、自包含运行时 10.0.12。
+- Visual Studio Build Tools 的桌面 C++ 工具和 Windows SDK；本版打包使用 Windows SDK 10.0.26100.0。
+- Windows App SDK 1.8.260921001，由项目 NuGet 引用恢复。
+- MSI 使用 WiX 4.0.6 及同版本 UI、Util 扩展；不要将扩展和 CLI 跨主版本混用。
 
-`build.ps1` 从环境变量定位工具链，选择已安装的 Windows Desktop 运行时及同主版本 Core。请检查构建输出，确保版本兼容；没有 C++ 工具链时只生成托管应用，不会获得完整安装所需的 EXE。
+## 应用
 
-## 打包
-
-```powershell
-.\installer\package-release.ps1 -BuildDirectory out\program -OutputDirectory out\release-1.0.6 -BuildId 1.0.6
-```
-
-要求 Visual Studio 安装的 Mono.Cecil、匹配运行时及 `installer/template/AirStereo-Setup-base.exe`。输出目录不得含既有安装包或 payload，以免覆盖历史产物。脚本保留 .NET 运行时的许可文件。打包不会自动上传 GitHub。
-
-应用版本在 `src/VersionInfo.cs`；发布时同时维护安装版本、README、CHANGELOG、发布说明及 `v1.0.6` 标签。输出安装包应先验收再发布。
-
-## 可重建范围
-
-应用和原生启动器源码完整提供。既有安装向导的原始源码未保留，模板仅含向导及独立卸载程序；脚本替换 payload、界面版本和卸载注册版本。不声称安装向导可完全从源码重建。详见 `installer/template/README.md`。
-
-运行时会话、个人配置、故障日志和产物目录不应提交或纳入源码压缩包。`src/native/LibALAC64.dll` 与 Apache 2.0 许可证文本属于 ALAC 运行依赖，应随实验/发布构建复制；当前版本仍仅支持 x64。
-
-
-
-## MSI 和 MSIX
-
-MSI 默认使用项目既有 WiX 4.0.6，或通过 -WixExe 指定已获得使用许可的工具路径；UpgradeCode 保持不变。
+在仓库根目录执行：
 
 ```powershell
-.\installer\package-msi.ps1 -PayloadDirectory out\release-1.0.6\payload -OutputDirectory out\release-1.0.6 -Version 1.0.6 -WixExe tools\wix\wix.exe
-.\installer\package-msix.ps1 -IdentityFile .\store-identity.json -OutputDirectory out\msix-1.0.6 -Version 1.0.6
+./build.ps1
+./dist/AirStereo.exe selftest
+./dist/AirStereo.exe language-selftest
+./dist/AirStereo.exe gui
 ```
 
-商店身份从合作伙伴中心复制到本地 JSON，不将个人证书、凭据或身份配置文件纳入源码包。MSIX 构建会保留应用身份、打包 Windows 启动任务桥接库，并生成资源索引、解包校验和哈希。详见 [MSIX 说明](MSIX.md)。
+默认输出 `dist/`，保留整个输出目录及 `AirStereo.pri`。WinUI 应使用 `AirStereo.exe` apphost 启动，不使用 `dotnet AirStereo.dll` 作为桌面入口。
 
+离线环境可指定已准备的 NuGet 源、缓存及 dotnet 路径：
 
+```powershell
+./build.ps1 -DotNet dotnet -NuGetSource ./packages/nuget-feed -NuGetPackageRoot ./packages/nuget-cache
+# 在匹配的恢复结果已存在时跳过恢复：
+./build.ps1 -NoRestore -NuGetPackageRoot ./packages/nuget-cache
+```
 
+不要把旧 `out-*` 发布目录放进 XAML 资源输入。工程排除这些目录；MSIX 脚本另行验证 PRI 中的每个文件路径。
 
+## MSI
 
+将 WiX 及扩展解包到脚本默认的 `packages/wix-tools/` 位置，或指定 `-WixExe`、`-UiExtension`、`-UtilExtension`。准备运行时许可证和已构建 payload：
 
-## 图标与 ALAC 原生依赖
+```powershell
+./installer/prepare-winui-payload.ps1 -SourceDirectory dist -DotNetRoot 'C:/Program Files/dotnet'
+./installer/package-msi.ps1
+```
 
-图标资源位于 assets/icons，SVG 原稿与各尺寸 ICO/PNG 一同提供。修改图标后，可使用 Python 与 Pillow 执行 tools/generate-icons.py；普通构建使用已有资源，无需 Python。
+非默认 NuGet 缓存可传 `-WindowsAppSDKDirectory`。脚本复制 .NET 与 Windows App SDK 的许可证，生成 BuildInfo 哈希清单并排除日志、设置和调试文件。MSI 输出到 `packages/release-1.0.7/ready/`；版本 1.0.7、语言 2052、固定 UpgradeCode `BC748A75-41B0-4A54-9AE8-01C901419467`。
 
-本版本保留 ALAC 初始化容量修复的源码与二进制；需要重新编译时先执行 installer/build-alac.ps1，再执行 build.ps1。上游出处、提交和修改范围见 src/native/libalac/AIRSTEREO_PATCH.md；Apache-2.0 许可随包保留。
+简体中文 WixUI_InstallDir、Restart Manager 与 CloseApplication 处理运行中应用占用；安装、升级和卸载仍需在目标环境实际验收。
+
+## MSIX 与源码
+
+参见 [MSIX.md](MSIX.md)。使用新的输出目录，避免覆盖既有构建。源码 ZIP 应从发布提交导出，不含 `.git`、输出目录、运行时配置、日志或签名材料。本版不制作 EXE 安装器。
+
+离线自检、实际安装、真实音响播放和 WACK 是不同验证层，记录结果时分别说明。

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Globalization;
 using System.Windows.Forms;
@@ -111,7 +111,7 @@ namespace AirStereo.Ui
 
             bands = new ValueSlider[AudioProfile.BandCount];
             bandValues = new Label[AudioProfile.BandCount];
-            string[] captions = { "60 Hz", "230 Hz", "910 Hz", "3.6 kHz", "12 kHz" };
+            string[] captions = { "31 Hz", "62 Hz", "125 Hz", "250 Hz", "500 Hz", "1 kHz", "2 kHz", "4 kHz", "8 kHz", "16 kHz" };
             for (int i = 0; i < bands.Length; i++)
             {
                 int band = i;
@@ -147,7 +147,7 @@ namespace AirStereo.Ui
 
             Label eqNote = new Label();
             eqFootnote = eqNote;
-            eqNote.Text = "五段峰值均衡器 · 每段 ±12 dB · 调整即时生效";
+            eqNote.Text = "十段峰值均衡器 · 每段 ±12 dB · 调整即时生效";
             eqNote.ForeColor = Muted;
             eqNote.TextAlign = ContentAlignment.MiddleCenter;
             eqNote.Dock = DockStyle.Bottom;

@@ -187,8 +187,21 @@ namespace AirStereo.Ui
                 check("UI preview starts without native form handle (no live log writes)", !form.IsHandleCreated, null);
                 var mute = (CheckBox)Field(form, "muteLocalOutputBox");
                 var auto = (CheckBox)Field(form, "autoConnectBox");
+                var reconnect = (CheckBox)Field(form, "autoReconnectBox");
+                var reconnectAttempts = (NumericUpDown)Field(form, "reconnectAttemptsBox");
                 var list = (CheckedListBox)Field(form, "autoConnectDeviceList");
                 check("UI new mute and auto-connect switches default OFF", !mute.Checked && !auto.Checked, null);
+                check("UI playback auto-reconnect defaults to enabled with three attempts",
+                    reconnect.Checked && reconnectAttempts.Value == 3 && reconnectAttempts.Enabled, null);
+                reconnect.Checked = false;
+                check("UI disabling playback auto-reconnect locks the attempt field",
+                    !reconnect.Checked && !reconnectAttempts.Enabled, null);
+                reconnect.Checked = true;
+                reconnectAttempts.Value = 7;
+                check("UI playback reconnect attempt setting stays within the user control",
+                    reconnect.Checked && reconnectAttempts.Enabled && reconnectAttempts.Value == 7 &&
+                    (int)Field(form, "maxPlaybackReconnectAttempts") == 7, null);
+                reconnectAttempts.Value = 3;
                 var backend = new FakeBackend(); var store = new FakeStore();
                 Set(form, "localMute", new LocalOutputMuteController(backend, store, _ => { }));
                 mute.Checked = true; Set(form, "playing", true); Set(form, "streamReady", true); Call(form, "UpdateLocalMute");

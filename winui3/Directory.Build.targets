@@ -1,0 +1,7 @@
+<Project>
+  <!-- The WinUI SDK evaluates the XAML compiler after the SDK defaults. Keep
+       the local assembly explicit for this unpackaged, hand-curated project. -->
+  <PropertyGroup>
+    <XamlLocalAssembly Condition="'$(XamlLocalAssembly)' == ''">$(IntermediateOutputPath)intermediatexaml\$(AssemblyName).dll</XamlLocalAssembly>
+  </PropertyGroup>
+</Project>

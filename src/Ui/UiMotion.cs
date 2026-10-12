@@ -16,7 +16,7 @@ namespace AirStereo.Ui
         private static bool AnimationsEnabled => SystemParametersInfo(0x1042, 0, out bool enabled, 0) && enabled;
         private readonly Control owner;
         private readonly List<Control> ancestors = new List<Control>();
-        private Timer timer;
+        private System.Windows.Forms.Timer timer;
         private float start, target;
         private long began;
         internal float Value { get; private set; }
@@ -37,7 +37,7 @@ namespace AirStereo.Ui
             start = Value; began = Environment.TickCount64;
             if (timer == null)
             {
-                timer = new Timer { Interval = 16 };
+                timer = new System.Windows.Forms.Timer { Interval = 16 };
                 timer.Tick += Tick;
             }
             timer.Start();

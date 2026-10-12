@@ -18,3 +18,8 @@ Diagnostics/
 *.cer
 *.pem
 store-identity.json
+
+bin/
+.toolchain/
+.nuget/
+*.wixpdb

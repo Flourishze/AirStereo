@@ -1,0 +1,71 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PlatformTarget>x64</PlatformTarget>
+    <UseWinUI>true</UseWinUI>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <WindowsAppSDKBootstrapInitialize>false</WindowsAppSDKBootstrapInitialize>
+    <SelfContained>true</SelfContained>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <DefaultItemExcludes>$(DefaultItemExcludes);out-*/**;packages/**;.toolchain/**</DefaultItemExcludes>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>AirStereo.ico</ApplicationIcon>
+    <AssemblyName>AirStereo</AssemblyName>
+    <RootNamespace>AirStereo</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+    <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
+    <EnableDefaultPageItems>false</EnableDefaultPageItems>
+    <StartupObject>AirStereo.Program</StartupObject>
+    <!-- The unpackaged WinUI compiler does not infer the local assembly when
+         the project intentionally uses an explicit Compile item list. -->
+    <NuGetAudit>false</NuGetAudit>
+    <EnablePriGenTooling>true</EnablePriGenTooling>
+    <NoWarn>$(NoWarn);WFO1000;CA1416</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ApplicationDefinition Include="App.xaml" />
+    <Page Include="WinUiMainWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <XamlRuntime>$(DefaultXamlRuntime)</XamlRuntime>
+    </Page>
+    <Page Include="WinUiSettingsWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <XamlRuntime>$(DefaultXamlRuntime)</XamlRuntime>
+    </Page>
+    <Compile Include="..\src\*.cs" LinkBase="OriginalSource" Exclude="..\src\Program.cs;..\src\SelfTest.cs" />
+    <Compile Include="..\src\Audio\**\*.cs" LinkBase="OriginalSource" />
+    <Compile Include="..\src\Protocol\**\*.cs" LinkBase="OriginalSource" />
+    <Compile Include="..\src\Session\**\*.cs" LinkBase="OriginalSource" />
+    <!-- Shared desktop services only; the visible surface is compiled WinUI XAML. -->
+    <Compile Include="..\src\Ui\DesktopServices.cs" LinkBase="OriginalSource\Ui" />
+    <Compile Include="..\src\Ui\PackageEnvironment.cs" LinkBase="OriginalSource\Ui" />
+    <Compile Include="..\src\Ui\UpdateService.cs" LinkBase="OriginalSource\Ui" />
+    <Compile Include="Program.WinUI.cs" />
+    <Compile Include="WinUiNative.cs" />
+    <Compile Include="WinUiController.cs" />
+    <Compile Include="WinUiMainWindow.cs" />
+    <Compile Include="WinUiMainView.cs" />
+    <Compile Include="WinUiSettingsWindow.cs" />
+    <Compile Include="WinUiSettingsView.cs" />
+    <Compile Include="WinUiBottomComboBox.cs" />
+    <Compile Include="WinUiMotion.cs" />
+    <Compile Include="WinUiTheme.cs" />
+    <Compile Include="WinUiLanguage.cs" />
+    <Compile Include="WinUiSelfTest.cs" />
+    <Compile Include="WinUiMemoryTest.cs" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260921001" />
+    <Content Include="AirStereo.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="TrayDark.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="TrayLight.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\src\native\LibALAC64.dll" Link="LibALAC64.dll" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\src\native\LibALAC-LICENSE.txt" Link="LibALAC-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

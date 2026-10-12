@@ -101,6 +101,11 @@ namespace AirStereo.Ui
             }
         }
 
+        public string[] ActivitySnapshot()
+        {
+            lock (gate) return activity.ToArray();
+        }
+
         public void Record(string category, string message, string detail, string context)
         {
             lock (gate)
@@ -194,5 +199,3 @@ namespace AirStereo.Ui
         }
     }
 }
-
-

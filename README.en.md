@@ -1,111 +1,59 @@
 # AirStereo
 
-[中文](README.md)
+[简体中文](README.md) · [Download 1.0.7](https://github.com/Flourishze/AirStereo/releases/tag/v1.0.7) · [Microsoft Store](https://apps.microsoft.com/detail/9NMX9H3GBGJ4)
 
-<a href="https://apps.microsoft.com/detail/9nmx9h3gbgj4?referrer=appbadge&mode=full" target="_blank"  rel="noopener noreferrer">
-	<img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200"/>
-</a>
+**Stream the sound playing on your Windows PC to compatible AirPlay / AirPlay 2 speakers over your local network.** Current standalone release: **1.0.7**.
 
-Windows x64 AirPlay audio sender. The current version is **1.0.6**. Source and standalone releases are published at [Flourishze/AirStereo](https://github.com/Flourishze/AirStereo). The Store edition is updated by Microsoft Store.
+AirStereo captures the system mix from the default output device for music, video, games and everyday applications. Choose speakers from the tray panel without importing audio files. It does not use Bluetooth or capture individual applications separately.
 
-## What Is AirStereo?
+## Features
 
-**AirStereo sends the system audio playing on a Windows PC to compatible AirPlay / AirPlay 2 speakers over your local network.** Play music, videos, or other application audio on your computer, then choose your speakers from the system-tray interface. There is no need to import audio files into AirStereo.
-
-It is an audio sender, not a music player, and it does not connect over Bluetooth. The PC and speakers must be on the same local network with device discovery and connections permitted. AirStereo captures the system mix from the default audio output device; it does not provide per-application audio selection or isolation.
-
-### Use Cases
-
-- **One speaker**: select one independent speaker to send full stereo audio, without configuring a two-device setup.
-- **Two independent speakers**: selection order assigns L / R for left/right output.
-- **An existing stereo pair in the Apple Home app**: when discovery information explicitly identifies the pair, connect to it as one logical target and let the receiver assign the physical channels.
-- **Multiple available speakers**: choose the targets for the current session. This version allows up to two independent speakers, not arbitrary multi-room playback.
-
-### Main Features
-
-| Feature | Current behavior |
+| Feature | Behavior |
 | --- | --- |
-| Wireless Windows audio | Capture the system mix from the default output device and send it to compatible AirPlay speakers over the local network |
-| Speaker list and checkboxes | Automatic discovery and manual refresh with selectable targets; no single/dual-device mode switch is required |
-| Full stereo on one speaker | Select one independent speaker for full stereo; left/right balance is disabled for this route |
-| L/R on two independent speakers | Select up to two speakers in order to assign L/R on one media timeline and PTP clock; either device disconnecting stops the two-device session |
-| Native Apple stereo pairs | Explicitly identified pairs appear as one logical target; full stereo is sent and the receivers assign physical channels |
-| Manual or real-time volume | By default, drag and click ✓ to apply; enable real-time adjustment to apply while dragging without a second confirmation |
-| Five-band EQ and balance | Five-band equalizer, left/right balance and one-click centering, available during playback with EQ bypass |
-| Left/right channel tests | Test tones temporarily bypass the current balance and restore it afterward |
-| Latency setting | Set the target buffer delay while stopped; it applies to the next session and is not a measured end-to-end delay |
-| Light, dark or system appearance | Saved, immediate theme changes with settings cards, native dropdowns, lightweight transitions, and large-text/high-DPI layouts |
-| Quick tray controls | Open speaker, playback and volume controls from the tray; transparent icons adapt to the Windows taskbar color |
-| Startup and auto-connect | Optional launch-to-tray at Windows sign-in and selected-target auto-connect; both are off by default |
-| Mute local output while streaming | Optionally mute PC output during wireless playback and restore the prior mute state when playback stops; off by default |
-| Fault records and diagnostic logs | View connection/playback failures and open the Diagnostics folder directly; an empty scan is a status message, not a fault |
-| Edition-aware update checks | Standalone builds check stable Releases in this repository; the Store edition is updated by Microsoft Store |
+| Speaker checklist | Automatic discovery and manual refresh; selection determines playback mode |
+| One independent speaker | Complete stereo output; balance is disabled |
+| Two independent speakers | First selection is L, second is R, sharing an audio timeline and PTP clock; either device disconnecting stops the group |
+| Native Apple stereo pair | A confirmed pair appears as one logical target; the receivers assign physical channels |
+| Manual / live volume | Drag then click ✓ to apply, or enable live volume to apply while dragging |
+| Ten-band equalizer | Vertical peaking EQ integrated into Settings, presets including Pop and Bass, bypass and L/R balance |
+| Encoding and sample rate | Lossless ALAC or uncompressed PCM, 44.1 / 48 kHz; ALAC, 16-bit/44.1 kHz by default |
+| Latency settings | Preset or custom buffering; latency, encoding and sample rate are locked during a connection |
+| Automatic reconnection | Optional 1–10 attempt limit; independent stereo reconnects as a complete group |
+| WinUI 3 Fluent interface | Compact tray panel, refresh animation, transparent tray icons, system/light/dark themes and high DPI layouts |
+| Chinese / English | Instant language switching with a saved preference |
+| Tray controls | Click the desktop to dismiss; Stop keeps the application running; Exit also closes Settings |
+| Startup options | Windows startup, silent startup and reconnecting the previous speakers on launch |
+| Local output mute | Optional PC mute while streaming, restoring the previous mute state when stopped |
+| Diagnostics and faults | Separate Settings pages and an Open folder action; empty discovery is a status, while actual network/playback errors are recorded |
+| Update checking | Standalone installations check this repository's stable Releases; Store installations use Microsoft Store |
 
-ALAC lossless encoding is the default, with active audio parameters available in diagnostics. PCM remains an experimental command-line fallback, not a codec dropdown in Settings.
+## Installation
 
-[Download](https://github.com/Flourishze/AirStereo/releases) · [Report a Problem / Request a Feature](https://github.com/Flourishze/AirStereo/issues) · [Changelog](CHANGELOG.md)
+- **Standalone MSI**: [AirStereo-1.0.7-x64.msi](https://github.com/Flourishze/AirStereo/releases/download/v1.0.7/AirStereo-1.0.7-x64.msi). A Simplified Chinese wizard supports directory selection, upgrades from 1.0.6 and handling a running application.
+- **Store edition**: [Microsoft Store](https://apps.microsoft.com/detail/9NMX9H3GBGJ4). Consult the Store page for its available version.
+- **MSIX**: The Release asset is an unsigned Store submission package, not a normal double-click installer.
+- **Source**: A ZIP of the release tag and `SHA256SUMS.txt` are provided. This release does not include an EXE installer.
 
-## Interface Preview
+Requires Windows 10 22H2 (build 19045) or later on x64, including Windows 11. Packages include .NET 10.0.12 and Windows App SDK; a separate .NET installation is unnecessary.
 
-![AirStereo 1.0.6 dark appearance](docs/images/airstereo-1.0.6-dark.png)
+## Usage
 
-![AirStereo 1.0.6 light appearance](docs/images/airstereo-1.0.6-light.png)
+1. Connect the PC and speakers to the same LAN and permit local discovery and traffic.
+2. Launch AirStereo and click its taskbar tray icon. Wait for discovery or refresh.
+3. Select one speaker or a native pair. For independent stereo, select L first and R second. Playback is disabled with no selection; at most two independent speakers are supported.
+4. Click Play PC audio, then play content on the PC. Drag volume and click ✓, or enable live adjustment.
+5. Use Settings for language, appearance, startup, reconnection and EQ. Stop the connection before changing encoding, sample rate or latency.
 
-Offline preview of the actual interface: speaker names and addresses are demonstration data, not evidence of a live device connection.
+ALAC and PCM preserve the same samples at the same sample rate and bit depth. ALAC usually uses less bandwidth, with the ratio depending on content; PCM uses more bandwidth and remains available as a fallback. Support for 48 kHz depends on receiver negotiation; use the default 44.1 kHz first if connections are unstable. The buffering setting is not a measurement of end-to-end latency.
 
-## Installation and Usage
+## Troubleshooting and feedback
 
-Use EXE for the installation wizard or MSI for deployment. Install the Store-signed edition from Microsoft Store; MSIX submission packages are managed separately by the maintainer, not offered as unsigned end-user installers. Do not run both editions simultaneously.
+If speakers are missing, check the subnet, Windows firewall, VPN/virtual adapters and router AP isolation. A Public Windows network profile may restrict discovery. Successful phone playback does not prove discovery traffic is allowed on the PC.
 
+Report problems through [Issues](https://github.com/Flourishze/AirStereo/issues), including the app/Windows versions, speaker model, encoding/sample rate, steps and relevant diagnostics. Redact device names, IP addresses, device IDs and other private information; never upload credentials.
 
-Download `AirStereo-Setup-1.0.6-x64.exe` from the repository's Releases page. Exit an older version from the tray menu before installing. The installer includes the .NET Core and Windows Desktop 10.0.12 runtimes and prefers the runtimes in the installation directory. No separate .NET runtime installation is required; the operating system must still be a Windows x64 version supported by .NET 10.
+## Documentation and license
 
-1. Click the AirStereo tray icon in the lower-right corner, scan for speakers, and select the targets you want to use.
-2. Playback is disabled when nothing is selected. Selecting one independent speaker sends full stereo audio and disables the left/right balance control.
-3. Selecting two independent speakers in order assigns the first speaker to L and the second speaker to R. Both speakers share one media timeline and PTP clock. A maximum of two independent speakers can be selected. To swap L/R, clear the selection and select the speakers in the opposite order.
-4. A native stereo pair identified by mDNS is shown as one logical target. The receiver handles the physical left/right assignment while AirStereo sends full stereo audio. Pair members cannot be selected separately, and a relationship inferred only from names is not treated as a confirmed native pair.
-5. Click Play to send computer audio. If either speaker in a two-speaker session disconnects, the entire session stops and the affected device is reported instead of silently degrading to mono.
+[1.0.7 release notes](docs/releases/v1.0.7.md) · [Changelog](CHANGELOG.md) · [Build](docs/BUILD.md) · [MSIX](docs/MSIX.md) · [Acceptance checklist](docs/TESTING.md)
 
-Actual compatibility depends on receiver firmware, access permissions, network conditions, and the service information exposed by the receiver. Not every device advertised as AirPlay-compatible is guaranteed to connect.
-
-Wireless playback includes capture, network, and receiver-buffer delays. The configured latency is not a measurement of end-to-end latency. AirStereo does not promise zero latency and is not a replacement for low-latency gaming audio or real-time monitoring equipment.
-
-## What's New in 1.0.6
-
-- Added optional real-time volume: when disabled, drag and click ✓ to apply; when enabled, dragging applies automatically. Manual mode remains the default.
-- Added system, light and dark appearance with consistent settings cards, native dropdowns, buttons and lightweight transitions.
-- Refreshed the app and transparent tray icons; improved refresh controls, EQ alignment, compact layouts and large-text presentation.
-- Fixed selection-marker trails after dropdown hover and improved buffered drawing while retaining native selection and keyboard behavior.
-- Simplified independent-speaker labels. Empty scans are status messages; unavailable networks, connection failures and interrupted playback still create fault records.
-- Refined auxiliary control-channel warning classification without discarding diagnostic log details.
-- Fixed an uninitialized ALAC magic-cookie buffer capacity that could cause encoder initialization to fail.
-- Retained single-speaker, independent L/R and native-pair routes, EQ, balance, test tones and latency settings.
-
-## Settings
-
-- **Audio**: optional real-time volume (off: drag then click ✓; on: apply automatically while dragging), volume, latency, left/right balance, balance reset, left/right test tones, and equalizer. Volume, balance, and test tones remain available during playback. Adjust latency after stopping playback; the change takes effect on the next playback session. Test tones temporarily bypass the user balance value and restore it when testing ends.
-- **General**: system/light/dark appearance, launch at startup, runtime and current-version information, and manual update checks. Update checks use only the latest stable Release in this repository, not drafts or pre-releases. A timeout is reported as a failed check rather than incorrectly reporting that the application is up to date. The new-version button opens the official Release page and does not download or execute files automatically.
-- **Diagnostics**: view issues and open the actual diagnostics folder. The folder can be opened even when no records exist; it is created automatically when necessary. Logs are written to the installation directory's `Diagnostics` folder when possible, with a fallback to the current user's local application-data directory at `AirStereo/Diagnostics` when the installation directory is not writable.
-- **Runtime log**: view current runtime information.
-
-Diagnostic logs may contain speaker names, network addresses, and system information. Review them before sharing. AirStereo does not upload diagnostics automatically or install updates automatically.
-
-## Feedback and Feature Requests
-
-Use this repository's [Issues](https://github.com/Flourishze/AirStereo/issues) to report connection failures, missing audio, channel or interface problems, or to request a feature.
-
-For a bug report, include the AirStereo version, Windows version, display scaling (for interface issues), speaker model, route type (single speaker, two independent speakers, or native pair), steps to reproduce, and screenshots or redacted diagnostic logs when available. Search existing issues before opening a duplicate. Do not publish passwords, tokens, or personal and network information without reviewing it first.
-
-## Build and Documentation
-
-See the [build guide](docs/BUILD.md), [acceptance checklist](docs/TESTING.md), [changelog](CHANGELOG.md), and [1.0.6 release notes](docs/releases/v1.0.6.md). The repository includes the application source and packaging scripts. The original source for the existing installer wizard is not included, so packaging still depends on the explicitly documented binary template.
-
-## License
-
-AirStereo's own code and documentation are licensed under the [MIT License](LICENSE), Copyright (c) 2026 Flourishze. The copyright notice and license text must be retained when using, modifying, or distributing the software. The software is provided "as is", without warranty.
-
-Third-party code, dependencies, the .NET runtime, and installer binary templates remain subject to their respective licenses; this repository's MIT License does not change those terms. The .NET runtime distributed with the installer retains its original `LICENSE` and `ThirdPartyNotices` files.
-
-AirStereo is an independent project and is not an official Apple application. AirPlay, HomePod, and other trademarks belong to their respective owners.
-
-
+Licensed under [MIT](LICENSE). Third-party components retain their own licenses and notices. AirStereo is an independent project and is not affiliated with Apple. AirPlay, HomePod and other trademarks belong to their respective owners.

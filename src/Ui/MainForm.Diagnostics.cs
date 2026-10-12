@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Diagnostics;
@@ -36,7 +36,7 @@ namespace AirStereo.Ui
 
         private Control BuildGeneralPage()
         {
-            Panel page = new Panel { BackColor = CanvasColor, ForeColor = InkColor, Padding = new Padding(14),
+            Panel page = new Panel { BackColor = CanvasColor, ForeColor = InkColor, Padding = new Padding(14, 2, 14, 2),
                 AutoScroll = true, AutoScrollMinSize = Size.Empty,
                 HorizontalScroll = { Enabled = false } };
             BufferedTableLayoutPanel grid = Grid(1);
@@ -44,9 +44,9 @@ namespace AirStereo.Ui
             grid.Dock = DockStyle.Top;
             grid.BackColor = CanvasColor;
             grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            grid.RowCount = 5;
+            grid.RowCount = 6;
             grid.RowStyles.Clear();
-            for (int i = 0; i < 5; i++) grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 100));
+            for (int i = 0; i < 6; i++) grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 100));
             startupBox = new SettingsSwitch { Text = "登录 Windows 后自动启动",
                 Description = "启动 AirStereo 并收在托盘中，不打断当前工作。", Dock = DockStyle.Fill,
                 ForeColor = InkColor, AccessibleName = "开机自启" };
@@ -66,7 +66,8 @@ namespace AirStereo.Ui
             };
             grid.Controls.Add(new SettingsCard(startupBox), 0, 0);
             grid.Controls.Add(new SettingsCard(BuildAppearanceOptions()), 0, 1);
-            grid.Controls.Add(new SettingsCard(BuildAutoConnectOptions()), 0, 2);
+            grid.Controls.Add(new SettingsCard(BuildPlaybackReconnectOptions()), 0, 2);
+            grid.Controls.Add(new SettingsCard(BuildAutoConnectOptions()), 0, 3);
             generalUpdateContent = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1,
                 RowCount = 2, Margin = new Padding(0) };
             generalUpdateContent.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -77,10 +78,10 @@ namespace AirStereo.Ui
                 "MSIX 版由 Microsoft Store 管理更新" : "更新来源：Flourishze/AirStereo 正式 Release", Dock = DockStyle.Fill,
                 ForeColor = MutedColor, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft };
             generalUpdateContent.Controls.Add(updateStatus, 0, 1);
-            grid.Controls.Add(new SettingsCard(generalUpdateContent), 0, 3);
+            grid.Controls.Add(new SettingsCard(generalUpdateContent), 0, 4);
             grid.Controls.Add(new Label { Text = "AirStereo " + VersionInfo.Current + "  ·  .NET " + Environment.Version + "  ·  " +
                 System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
-                Dock = DockStyle.Fill, ForeColor = MutedColor, TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true }, 0, 4);
+                Dock = DockStyle.Fill, ForeColor = MutedColor, TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true }, 0, 5);
             page.Controls.Add(grid);
             return page;
         }
@@ -252,4 +253,3 @@ namespace AirStereo.Ui
         }
     }
 }
-

@@ -27,15 +27,19 @@ namespace AirStereo.Ui
             int appearanceHeight = choiceHeight + Math.Max(P(24), text * 2) + extra;
             autoConnectBox.Height = Math.Max(P(32), text + P(12));
             autoConnectHint.Height = text * 2 + P(4);
-            // Reserve two rows for common setups, grow up to four, then let the
-            // existing native list scroll. Never remove targets or change checks.
-            int visibleRows = Math.Max(2, Math.Min(4, autoConnectDeviceList.Items.Count));
+            // Keep the general page compact at every DPI. The native list remains
+            // scrollable when more than two configured targets are available.
+            int visibleRows = 2;
             int listHeight = visibleRows * Math.Max(autoConnectDeviceList.ItemHeight, text) +
                 Math.Max(SystemInformation.HorizontalScrollBarHeight, P(17)) + P(4);
             int autoHeight = autoConnectBox.Height + autoConnectHint.Height + listHeight + extra;
+            // The switch and numeric input are Dock=Fill inside a padded card.
+            // Reserve a small scaled margin for native control rounding.
+            int reconnectHeight = Math.Max(P(48), text * 3 + P(4)) + P(10);
             generalUpdateContent.RowStyles[0].Height = Math.Max(P(38), text + P(18));
             int updateHeight = (int)generalUpdateContent.RowStyles[0].Height + text * 2 + P(4) + extra;
-            int[] heights = { Math.Max(P(48), text * 3 + P(4)) + extra, appearanceHeight, autoHeight, updateHeight, text + P(14) };
+            int[] heights = { Math.Max(P(48), text * 3 + P(4)) + extra, appearanceHeight,
+                reconnectHeight, autoHeight, updateHeight, text + P(7) };
             settingsGeneralGrid.RowStyles.Clear();
             int total = 0;
             foreach (int height in heights) { settingsGeneralGrid.RowStyles.Add(new RowStyle(SizeType.Absolute,height)); total += height; }
