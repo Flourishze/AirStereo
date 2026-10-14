@@ -1,8 +1,8 @@
 # AirStereo
 
-[English](README.en.md) · [下载 1.0.7](https://github.com/Flourishze/AirStereo/releases/tag/v1.0.7) · [Microsoft Store](https://apps.microsoft.com/detail/9NMX9H3GBGJ4)
+[English](README.en.md) · [下载 1.0.8](https://github.com/Flourishze/AirStereo/releases/tag/v1.0.8) · [Microsoft Store](https://apps.microsoft.com/detail/9NMX9H3GBGJ4)
 
-**将 Windows 电脑正在播放的声音，通过局域网无线发送到兼容 AirPlay / AirPlay 2 的音响。** 当前独立安装版：**1.0.7**。
+**将 Windows 电脑正在播放的声音，通过局域网无线发送到兼容 AirPlay / AirPlay 2 的音响。** 当前独立安装版：**1.0.8**。
 
 AirStereo 采集默认输出设备的系统混音，适合音乐、视频、游戏和日常应用声音。通过右下角托盘选择音响，无需导入音频文件。它不使用蓝牙，也不提供按应用隔离采集。
 
@@ -10,7 +10,7 @@ AirStereo 采集默认输出设备的系统混音，适合音乐、视频、游�
 
 | 功能 | 说明 |
 | --- | --- |
-| 音响列表与勾选连接 | 自动扫描、手动刷新；勾选数量自动决定播放方式，无需切换单设备/双设备模式 |
+| 音响列表与勾选连接 | 自动扫描、手动刷新；1.0.8 改进多网卡环境下的有线发现；勾选数量自动决定播放方式，无需切换单设备/双设备模式 |
 | 单设备完整立体声 | 选择一只独立音响发送完整立体声，左右平衡禁用 |
 | 双独立音响 L/R | 最多两只，按勾选顺序分配 L/R，共用音频时间线和 PTP 时钟；任一成员掉线停止整组 |
 | Apple 原生立体声对 | 扫描信息确认配对后作为一个逻辑目标，由音响分配物理左右声道 |
@@ -36,9 +36,9 @@ AirStereo 采集默认输出设备的系统混音，适合音乐、视频、游�
 
 ## 安装
 
-- **MSI 独立安装版**：[AirStereo-1.0.7-x64.msi](https://github.com/Flourishze/AirStereo/releases/download/v1.0.7/AirStereo-1.0.7-x64.msi)。简体中文安装向导，可选择安装路径，支持从 1.0.6 升级并处理应用占用。
+- **MSI 独立安装版**：[AirStereo-1.0.8-x64.msi](https://github.com/Flourishze/AirStereo/releases/download/v1.0.8/AirStereo-1.0.8-x64.msi)。简体中文安装向导，可选择安装路径，沿用旧版升级及应用占用处理配置。
 - **商店版**：[Microsoft Store](https://apps.microsoft.com/detail/9NMX9H3GBGJ4)。商店版本以商店页面为准。
-- **MSIX**：Release 中的 MSIX 是未签名的商店提交包，不作为日常双击安装包使用。
+- **MSIX**：仅用于 Microsoft Store 提交，不作为 GitHub 下载资产分发。
 - **源码**：Release 提供对应标签的 Source ZIP；校验文件见 `SHA256SUMS.txt`。本版不提供 EXE 安装器。
 
 系统要求：Windows 10 22H2（19045）或更新的 Windows x64、Windows 11。安装包自包含 .NET 10.0.12 和 Windows App SDK，无需另装 .NET。
@@ -61,6 +61,6 @@ ALAC 与 PCM 在相同采样率和位深下保留相同音频样本。ALAC 通�
 
 ## 文档与许可
 
-[1.0.7 更新说明](docs/releases/v1.0.7.md) · [CHANGELOG](CHANGELOG.md) · [构建](docs/BUILD.md) · [MSIX](docs/MSIX.md) · [验收清单](docs/TESTING.md)
+[1.0.8 更新说明](docs/releases/v1.0.8.md) · [CHANGELOG](CHANGELOG.md) · [构建](docs/BUILD.md) · [MSIX](docs/MSIX.md) · [验收清单](docs/TESTING.md)
 
 项目采用 [MIT 许可证](LICENSE)。第三方组件遵循各自许可证，发布包保留相关声明。AirStereo 是独立项目，与 Apple 无关联；AirPlay、HomePod 等商标属于其所有者。

@@ -1,6 +1,6 @@
-# AirStereo 1.0.7 MSIX
+# AirStereo 1.0.8 MSIX
 
-当前提交包使用 WinUI 3 自包含应用，版本 **1.0.7.0**、x64、最低 Windows **10.0.19045.0**。运行时包含 .NET 10.0.12 和 Windows App SDK 1.8.260921001。
+当前提交包使用 WinUI 3 自包含应用，版本 **1.0.8.0**、x64、最低 Windows **10.0.19045.0**。运行时包含 .NET 10.0.12 和 Windows App SDK 1.8.260921001。
 
 ## 商店身份
 
@@ -26,7 +26,7 @@
 ```
 
 ```powershell
-./installer/package-winui-msix.ps1 -IdentityFile ./store-identity.json
+./installer/package-winui-msix.ps1 -IdentityFile ./store-identity.json -PayloadDirectory packages/release-1.0.8/payload -OutputDirectory packages/release-1.0.8/msix -Version 1.0.8
 ```
 
 脚本选择已安装的 Windows SDK / C++ 工具，编译商店服务桥与启动辅助程序，生成多 DPI 图标、PRI、MSIX 和 SHA-256 清单。所有路径限制在工作区内，输出目录必须为新目录。
@@ -39,7 +39,7 @@
 
 ## 提交与安装
 
-Release 中的 MSIX **未签名**，供 Partner Center 的现有产品提交使用。微软商店完成签名和分发；它不适合直接双击作为普通安装器，本地证书不受信任提示不代表商店身份错误。
+MSIX **未签名**，供 Partner Center 的现有产品提交使用，保留本地，不作为后续 GitHub Release 资产。微软商店完成签名和分发；它不适合直接双击作为普通安装器，本地证书不受信任提示不代表商店身份错误。
 
 日常安装选择 MSI 或 Microsoft Store。上传前确认包身份、版本和架构，提交后以 Partner Center 的认证状态为准。包结构和哈希校验不等同于已通过安装部署、WACK 或商店认证。
 

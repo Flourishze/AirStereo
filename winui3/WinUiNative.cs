@@ -266,6 +266,7 @@ internal static class WinUiLauncher
     {
         try
         {
+            WinUiStartupDiagnostics.Trace("Application.Start");
             WinRT.ComWrappersSupport.InitializeComWrappers();
             Microsoft.UI.Xaml.Application.Start(queueController =>
             {
@@ -278,7 +279,7 @@ internal static class WinUiLauncher
         }
         catch (Exception error)
         {
-            try { File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "winui-startup-error.txt"), error.ToString()); } catch { }
+            WinUiStartupDiagnostics.Error(error);
             WinUiNative.MessageBoxW(0, "AirStereo WinUI 3 启动失败：" + error.Message, "AirStereo", 0x10);
             return 1;
         }
@@ -298,6 +299,8 @@ public sealed partial class WinUiApplication : Microsoft.UI.Xaml.Application
     internal WinUiApplication(bool startInTray, int silenceDisconnectMilliseconds, bool useAlac,
         Session.SilenceFrameMode silenceMode, bool languageSelfTest = false, bool memorySelfTest = false)
     {
+        UnhandledException += (_, args) => WinUiStartupDiagnostics.Error(args.Exception, args.Message);
+        WinUiStartupDiagnostics.Trace("Application initializing");
         // Application-level resources and the native XAML surface must start
         // in the saved theme too, not just inherit it later from an inner Grid.
         // Default mode deliberately leaves Windows' app preference untouched.
@@ -306,11 +309,7 @@ public sealed partial class WinUiApplication : Microsoft.UI.Xaml.Application
         else if (WinUiTheme.Mode == WinUiAppearanceMode.Light)
             RequestedTheme = ApplicationTheme.Light;
         InitializeComponent();
-        UnhandledException += (_, args) =>
-        {
-            try { File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "winui-startup-error.txt"), args.Exception?.ToString() ?? args.Message); }
-            catch { }
-        };
+        WinUiStartupDiagnostics.Trace("Application initialized");
         this.startInTray = startInTray;
         this.silenceDisconnectMilliseconds = silenceDisconnectMilliseconds;
         this.useAlac = useAlac;
@@ -334,16 +333,16 @@ public sealed partial class WinUiApplication : Microsoft.UI.Xaml.Application
         }
         try
         {
-            File.AppendAllText(Path.Combine(AppContext.BaseDirectory, "winui-startup-trace.txt"), DateTimeOffset.Now + " OnLaunched" + Environment.NewLine);
+            WinUiStartupDiagnostics.Trace("OnLaunched");
             main = new WinUiMainWindow(startInTray, silenceDisconnectMilliseconds, useAlac, silenceMode);
-            File.AppendAllText(Path.Combine(AppContext.BaseDirectory, "winui-startup-trace.txt"), DateTimeOffset.Now + " Window constructed" + Environment.NewLine);
+            WinUiStartupDiagnostics.Trace("Window constructed");
             main.InitializeLaunch(startInTray);
-            File.AppendAllText(Path.Combine(AppContext.BaseDirectory, "winui-startup-trace.txt"), DateTimeOffset.Now + " OnLaunched complete" + Environment.NewLine);
+            WinUiStartupDiagnostics.Trace("OnLaunched complete");
         }
         catch (Exception error)
         {
-            File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "winui-startup-error.txt"), error.ToString());
-            WinUiNative.MessageBoxW(0, "AirStereo 界面启动失败，详情见 winui-startup-error.txt。\n" + error.Message, "AirStereo", 0x10);
+            WinUiStartupDiagnostics.Error(error);
+            WinUiNative.MessageBoxW(0, "AirStereo 界面启动失败，已尝试保存诊断日志。\n" + error.Message, "AirStereo", 0x10);
             throw;
         }
     }

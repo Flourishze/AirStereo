@@ -102,15 +102,36 @@ namespace AirStereo
 
         private static void SendQueries(Socket socket, string[] serviceTypes, Result result)
         {
-            foreach (string service in serviceTypes)
+            // Joining every interface only controls reception. Select each query's
+            // outbound interface as well, so adapter changes cannot hide receivers.
+            foreach (NetworkInterface nic in NetworkInterface.GetAllNetworkInterfaces())
             {
-                try
+                if (nic.OperationalStatus != OperationalStatus.Up) continue;
+                if (nic.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
+                foreach (UnicastIPAddressInformation address in nic.GetIPProperties().UnicastAddresses)
                 {
-                    socket.SendTo(BuildQuery(service), new IPEndPoint(MulticastGroup, MdnsPort));
-                }
-                catch (SocketException error)
-                {
-                    result.Warnings.Add("query failed for " + service + ": " + error.Message);
+                    if (address.Address.AddressFamily != AddressFamily.InterNetwork) continue;
+                    try
+                    {
+                        socket.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastInterface,
+                            address.Address.GetAddressBytes());
+                    }
+                    catch (SocketException error)
+                    {
+                        result.Warnings.Add("query interface failed on " + address.Address + ": " + error.Message);
+                        continue;
+                    }
+                    foreach (string service in serviceTypes)
+                    {
+                        try
+                        {
+                            socket.SendTo(BuildQuery(service), new IPEndPoint(MulticastGroup, MdnsPort));
+                        }
+                        catch (SocketException error)
+                        {
+                            result.Warnings.Add("query failed for " + service + " on " + address.Address + ": " + error.Message);
+                        }
+                    }
                 }
             }
         }

@@ -1,8 +1,8 @@
 # AirStereo
 
-[简体中文](README.md) · [Download 1.0.7](https://github.com/Flourishze/AirStereo/releases/tag/v1.0.7) · [Microsoft Store](https://apps.microsoft.com/detail/9NMX9H3GBGJ4)
+[简体中文](README.md) · [Download 1.0.8](https://github.com/Flourishze/AirStereo/releases/tag/v1.0.8) · [Microsoft Store](https://apps.microsoft.com/detail/9NMX9H3GBGJ4)
 
-**Stream the sound playing on your Windows PC to compatible AirPlay / AirPlay 2 speakers over your local network.** Current standalone release: **1.0.7**.
+**Stream the sound playing on your Windows PC to compatible AirPlay / AirPlay 2 speakers over your local network.** Current standalone release: **1.0.8**.
 
 AirStereo captures the system mix from the default output device for music, video, games and everyday applications. Choose speakers from the tray panel without importing audio files. It does not use Bluetooth or capture individual applications separately.
 
@@ -10,7 +10,7 @@ AirStereo captures the system mix from the default output device for music, vide
 
 | Feature | Behavior |
 | --- | --- |
-| Speaker checklist | Automatic discovery and manual refresh; selection determines playback mode |
+| Speaker checklist | Automatic discovery and manual refresh; 1.0.8 improves wired discovery with multiple network adapters; selection determines playback mode |
 | One independent speaker | Complete stereo output; balance is disabled |
 | Two independent speakers | First selection is L, second is R, sharing an audio timeline and PTP clock; either device disconnecting stops the group |
 | Native Apple stereo pair | A confirmed pair appears as one logical target; the receivers assign physical channels |
@@ -36,9 +36,9 @@ AirStereo captures the system mix from the default output device for music, vide
 
 ## Installation
 
-- **Standalone MSI**: [AirStereo-1.0.7-x64.msi](https://github.com/Flourishze/AirStereo/releases/download/v1.0.7/AirStereo-1.0.7-x64.msi). A Simplified Chinese wizard supports directory selection, upgrades from 1.0.6 and handling a running application.
+- **Standalone MSI**: [AirStereo-1.0.8-x64.msi](https://github.com/Flourishze/AirStereo/releases/download/v1.0.8/AirStereo-1.0.8-x64.msi). A Simplified Chinese wizard supports directory selection and retains the existing upgrade and running-application handling configuration.
 - **Store edition**: [Microsoft Store](https://apps.microsoft.com/detail/9NMX9H3GBGJ4). Consult the Store page for its available version.
-- **MSIX**: The Release asset is an unsigned Store submission package, not a normal double-click installer.
+- **MSIX**: Used only for Microsoft Store submission; not distributed as a GitHub download asset.
 - **Source**: A ZIP of the release tag and `SHA256SUMS.txt` are provided. This release does not include an EXE installer.
 
 Requires Windows 10 22H2 (build 19045) or later on x64, including Windows 11. Packages include .NET 10.0.12 and Windows App SDK; a separate .NET installation is unnecessary.
@@ -61,6 +61,6 @@ Report problems through [Issues](https://github.com/Flourishze/AirStereo/issues)
 
 ## Documentation and license
 
-[1.0.7 release notes](docs/releases/v1.0.7.md) · [Changelog](CHANGELOG.md) · [Build](docs/BUILD.md) · [MSIX](docs/MSIX.md) · [Acceptance checklist](docs/TESTING.md)
+[1.0.8 release notes](docs/releases/v1.0.8.md) · [Changelog](CHANGELOG.md) · [Build](docs/BUILD.md) · [MSIX](docs/MSIX.md) · [Acceptance checklist](docs/TESTING.md)
 
 Licensed under [MIT](LICENSE). Third-party components retain their own licenses and notices. AirStereo is an independent project and is not affiliated with Apple. AirPlay, HomePod and other trademarks belong to their respective owners.

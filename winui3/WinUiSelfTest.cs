@@ -156,6 +156,8 @@ internal static class SelfTest
         checks += startupChecks;
         if (!VerifySilentStartup(out int silentChecks)) return 1;
         checks += silentChecks;
+        if (!VerifyStartupDiagnostics(out int diagnosticChecks)) return 1;
+        checks += diagnosticChecks;
         string[] uiKeys = { "设置", "诊断日志", "故障信息", "播放电脑声音", "实时音量调整", "扫描中…", "连接中…",
             "播放中", "流行", "平坦", "自定义", "跟随系统", "原生立体声对 · {0} 只" };
         foreach (string key in uiKeys)
@@ -185,8 +187,39 @@ internal static class SelfTest
             !WinUiMainWindow.ShouldDismissPopup(true, true, false, false, 1, 2, 2),
             "Hidden or exiting popup must not schedule dismissal.")) return 1;
         checks++;
-        Console.WriteLine("AirStereo WinUI self-test passed: " + checks + " checks (10-band EQ, startup routes, Chinese/English text).");
+        Console.WriteLine("AirStereo WinUI self-test passed: " + checks + " checks (10-band EQ, startup routes/diagnostics, Chinese/English text).");
         return 0;
+    }
+
+    private static bool VerifyStartupDiagnostics(out int checks)
+    {
+        checks = 0;
+        string fixture = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AirStereo-startup-diagnostics-" + Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(fixture);
+        try
+        {
+            string blocked = System.IO.Path.Combine(fixture, "blocked");
+            System.IO.File.WriteAllText(blocked, "A file prevents using this path as a log directory.");
+            string fallback = System.IO.Path.Combine(fixture, "fallback");
+            bool written = WinUiStartupDiagnostics.WriteToDirectories("error.txt", "original failure\n",
+                () => throw new InvalidOperationException("Package data unavailable."), () => blocked, () => fallback);
+            if (!Verify(written && System.IO.File.ReadAllText(System.IO.Path.Combine(fallback, "error.txt")) == "original failure\n",
+                "Failed data lookup and unwritable directory must fall back without replacing the original error.")) return false;
+            checks++;
+            if (!Verify(WinUiStartupDiagnostics.WriteToDirectories("error.txt", "later failure\n", () => fallback) &&
+                System.IO.File.ReadAllText(System.IO.Path.Combine(fallback, "error.txt")) == "original failure\nlater failure\n",
+                "Later startup diagnostics must retain earlier exceptions.")) return false;
+            checks++;
+            if (!Verify(!WinUiStartupDiagnostics.WriteToDirectories("error.txt", "unavailable", () => blocked,
+                () => throw new UnauthorizedAccessException()), "All failed log destinations must return without throwing.")) return false;
+            checks++;
+            string unused = System.IO.Path.Combine(fixture, "unused");
+            if (!Verify(WinUiStartupDiagnostics.WriteToDirectories("trace.txt", "started", () => fallback, () => unused) &&
+                !System.IO.Directory.Exists(unused), "A successful primary log write must not also write fallback directories.")) return false;
+            checks++;
+            return true;
+        }
+        finally { System.IO.Directory.Delete(fixture, true); }
     }
 
     private static bool VerifyStartupRoutes(out int checks)

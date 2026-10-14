@@ -1,4 +1,4 @@
-# 构建 AirStereo 1.0.7
+# 构建 AirStereo 1.0.8
 
 当前桌面入口为 `winui3/AirStereo.WinUI.csproj`，使用编译型 XAML。`src/Audio`、`src/Protocol`、`src/Session` 提供共享音频与协议实现；`src/Ui` 中的旧 WinForms 界面保留供历史参考，当前工程只引用共享桌面服务。
 
@@ -37,16 +37,16 @@
 将 WiX 及扩展解包到脚本默认的 `packages/wix-tools/` 位置，或指定 `-WixExe`、`-UiExtension`、`-UtilExtension`。准备运行时许可证和已构建 payload：
 
 ```powershell
-./installer/prepare-winui-payload.ps1 -SourceDirectory dist -DotNetRoot 'C:/Program Files/dotnet'
-./installer/package-msi.ps1
+./installer/prepare-winui-payload.ps1 -SourceDirectory dist -PayloadDirectory packages/release-1.0.8/payload -Version 1.0.8 -DotNetRoot 'C:/Program Files/dotnet'
+./installer/package-msi.ps1 -PayloadDirectory packages/release-1.0.8/payload -OutputDirectory packages/release-1.0.8/msi -Version 1.0.8
 ```
 
-非默认 NuGet 缓存可传 `-WindowsAppSDKDirectory`。脚本复制 .NET 与 Windows App SDK 的许可证，生成 BuildInfo 哈希清单并排除日志、设置和调试文件。MSI 输出到 `packages/release-1.0.7/ready/`；版本 1.0.7、语言 2052、固定 UpgradeCode `BC748A75-41B0-4A54-9AE8-01C901419467`。
+非默认 NuGet 缓存可传 `-WindowsAppSDKDirectory`。脚本复制 .NET 与 Windows App SDK 的许可证，生成 BuildInfo 哈希清单并排除日志、设置和调试文件。上述 MSI 输出到 `packages/release-1.0.8/msi/`；版本 1.0.8、语言 2052、固定 UpgradeCode `BC748A75-41B0-4A54-9AE8-01C901419467`。为兼容旧配方，脚本的旧默认值不代表当前版本；本版明确传入版本及新目录。
 
 简体中文 WixUI_InstallDir、Restart Manager 与 CloseApplication 处理运行中应用占用；安装、升级和卸载仍需在目标环境实际验收。
 
 ## MSIX 与源码
 
-参见 [MSIX.md](MSIX.md)。使用新的输出目录，避免覆盖既有构建。源码 ZIP 应从发布提交导出，不含 `.git`、输出目录、运行时配置、日志或签名材料。本版不制作 EXE 安装器。
+参见 [MSIX.md](MSIX.md)。使用新的输出目录，避免覆盖既有构建。MSIX 仅用于商店提交和本地留存，不作为后续 GitHub Release 资产。源码 ZIP 应从发布提交导出，不含 `.git`、输出目录、运行时配置、日志或签名材料。本版不制作 EXE 安装器。
 
 离线自检、实际安装、真实音响播放和 WACK 是不同验证层，记录结果时分别说明。

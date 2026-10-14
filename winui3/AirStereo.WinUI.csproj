@@ -50,6 +50,7 @@
     <Compile Include="..\src\Ui\UpdateService.cs" LinkBase="OriginalSource\Ui" />
     <Compile Include="Program.WinUI.cs" />
     <Compile Include="WinUiNative.cs" />
+    <Compile Include="WinUiStartupDiagnostics.cs" />
     <Compile Include="WinUiController.cs" />
     <Compile Include="WinUiMainWindow.cs" />
     <Compile Include="WinUiMainView.cs" />
