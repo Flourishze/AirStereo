@@ -1,66 +1,67 @@
-# AirStereo
+# AirStereo2
 
-[简体中文](README.md) · [Download 1.0.8](https://github.com/Flourishze/AirStereo/releases/tag/v1.0.8) · [Microsoft Store](https://apps.microsoft.com/detail/9NMX9H3GBGJ4)
+[简体中文](README.md) · [Download 1.0.9](https://github.com/Flourishze/AirStereo/releases/tag/v1.0.9)
 
-**Stream the sound playing on your Windows PC to compatible AirPlay / AirPlay 2 speakers over your local network.** Current standalone release: **1.0.8**.
+**Stream audio playing on your Windows PC over your local network to compatible AirPlay / AirPlay 2 speakers.** Current release: **1.0.9** (AirStereo2).
 
-AirStereo captures the system mix from the default output device for music, video, games and everyday applications. Choose speakers from the tray panel without importing audio files. It does not use Bluetooth or capture individual applications separately.
+AirStereo2 captures the system mix from your default Windows output device for music, video, games, and everyday applications. Select speakers from the system tray panel and start streaming with no audio file imports and no Bluetooth required.
 
 ## Features
 
-| Feature | Behavior |
+| Feature | Description |
 | --- | --- |
-| Speaker checklist | Automatic discovery and manual refresh; 1.0.8 improves wired discovery with multiple network adapters; selection determines playback mode |
-| One independent speaker | Complete stereo output; balance is disabled |
-| Two independent speakers | First selection is L, second is R, sharing an audio timeline and PTP clock; either device disconnecting stops the group |
-| Native Apple stereo pair | A confirmed pair appears as one logical target; the receivers assign physical channels |
-| Manual / live volume | Drag then click ✓ to apply, or enable live volume to apply while dragging |
-| Ten-band equalizer | Vertical peaking EQ integrated into Settings, presets including Pop and Bass, bypass and L/R balance |
-| Encoding and sample rate | Lossless ALAC or uncompressed PCM, 44.1 / 48 kHz; ALAC, 16-bit/44.1 kHz by default |
-| Latency settings | Preset or custom buffering; latency, encoding and sample rate are locked during a connection |
-| Automatic reconnection | Optional 1–10 attempt limit; independent stereo reconnects as a complete group |
-| WinUI 3 Fluent interface | Compact tray panel, refresh animation, transparent tray icons, system/light/dark themes and high DPI layouts |
-| Chinese / English | Instant language switching with a saved preference |
-| Tray controls | Click the desktop to dismiss; Stop keeps the application running; Exit also closes Settings |
-| Startup options | Windows startup, silent startup and reconnecting the previous speakers on launch |
-| Local output mute | Optional PC mute while streaming, restoring the previous mute state when stopped |
-| Diagnostics and faults | Separate Settings pages and an Open folder action; empty discovery is a status, while actual network/playback errors are recorded |
-| Update checking | Standalone installations check this repository's stable Releases; Store installations use Microsoft Store |
+| AirPlay 1 / AirPlay 2 support | Automatic LAN discovery and manual refresh for AirPlay and AirPlay 2 receivers |
+| Single, multi-speaker & stereo pair | Stream full stereo to a single speaker, synchronize multiple speakers, or target native Apple stereo pairs (HomePod / HomePod mini) |
+| Manual / live volume control | Drag and click ✓ to apply, or enable live volume adjustment for instant updates |
+| System volume sync | Optional automatic sync from Windows keyboard/taskbar volume controls to AirStereo2 |
+| Local mute guard | Automatically mutes local PC speakers while streaming; if system volume adjustment unmutes Windows, automatically re-mutes after ~0.5 s and restores the original mute state when stopped |
+| Five latency buffer tiers | Choose `Automatic`, `Normal · 200 ms`, `Balanced · 300 ms`, `Stable · 500 ms`, or `Custom (0–1000 ms)` (locked while playing) |
+| Lossless & uncompressed audio | `ALAC · Lossless compression` and `PCM · Uncompressed` at AirPlay standard 16-bit / 44.1 kHz |
+| Ten-band equalizer | Vertical 10-band EQ in Settings with built-in presets, real-time effect, and clean bypass when disabled |
+| External takeover & status alerts | Playback card shows measured latency, codec, and failure details; when an iPhone/iPad takes over a speaker, PC streaming pauses automatically with a tray notification and **Reclaim connection now** / **Stop waiting** actions |
+| Automatic reconnection | Automatically recovers receiver connections after temporary interruptions |
+| WinUI 3 Fluent interface | Compact tray popup, taskbar theme-adaptive tray icons, System/Light/Dark themes, and high-DPI layouts |
+| Chinese / English | Instant bilingual switching with saved preference |
+| Tray shortcuts & notifications | Dynamic tray hover status and volume, right-click quick connect / stop playback, and a notification toggle in Settings |
+| Startup & default speakers | Windows auto-start, silent tray startup, and a visible speaker checklist in Settings for automatic launch connection |
+| Diagnostics, network & firewall | Export diagnostic reports, open log folders, run receiver network checks, and repair Windows Firewall rules directly from Settings |
+| GitHub update checker | Checks official releases in this repository reliably across direct and proxy/VPN connections |
 
-## screenshot
-<img width="1920" height="1080" alt="01-dark-overview" src="https://github.com/user-attachments/assets/2115c7ed-62ff-45c8-98de-2071ba3d29f0" />
-<img width="1920" height="1080" alt="02-light-overview" src="https://github.com/user-attachments/assets/ddae357c-3753-4664-8e75-cc146096256b" />
-<img width="1920" height="1080" alt="03-ten-band-eq" src="https://github.com/user-attachments/assets/37d642dd-cb5e-4c94-9089-fad8fa190765" />
-<img width="1920" height="1080" alt="04-startup-reconnect" src="https://github.com/user-attachments/assets/e37c4d23-773b-47bb-aa69-20b1d0745712" />
+## Screenshots
 
+![AirStereo2 1.0.9 Dark Overview](docs/images/airstereo2-1.0.9-dark-overview.png)
+![AirStereo2 1.0.9 Light Overview & System Behavior](docs/images/airstereo2-1.0.9-light-overview.png)
+![AirStereo2 1.0.9 10-Band Equalizer](docs/images/airstereo2-1.0.9-equalizer.png)
+![AirStereo2 1.0.9 Takeover Alert & Network Diagnostics](docs/images/airstereo2-1.0.9-takeover-network.png)
 
 ## Installation
 
-- **Standalone MSI**: [AirStereo-1.0.8-x64.msi](https://github.com/Flourishze/AirStereo/releases/download/v1.0.8/AirStereo-1.0.8-x64.msi). A Simplified Chinese wizard supports directory selection and retains the existing upgrade and running-application handling configuration.
-- **Store edition**: [Microsoft Store](https://apps.microsoft.com/detail/9NMX9H3GBGJ4). Consult the Store page for its available version.
-- **MSIX**: Used only for Microsoft Store submission; not distributed as a GitHub download asset.
-- **Source**: A ZIP of the release tag and `SHA256SUMS.txt` are provided. This release does not include an EXE installer.
+- **Standalone MSI Installer**: [AirStereo2-1.0.9-x64.msi](https://github.com/Flourishze/AirStereo/releases/download/v1.0.9/AirStereo2-1.0.9-x64.msi)
+  - Simplified Chinese installation wizard with MIT license text and customizable install directory;
+  - Detects existing installations for in-place upgrade, remembers the previous install path, and cleanly closes running instances before updating;
+  - Includes a **Launch AirStereo2** option on the completion screen.
+- **Checksums**: Verify downloads with `SHA256SUMS.txt` attached to the release.
 
-Requires Windows 10 22H2 (build 19045) or later on x64, including Windows 11. Packages include .NET 10.0.12 and Windows App SDK; a separate .NET installation is unnecessary.
+System requirements: Windows 10 22H2 (build 19045) or later on x64, or Windows 11. Runtime and Windows App SDK are bundled; no separate .NET installation is required.
 
 ## Usage
 
-1. Connect the PC and speakers to the same LAN and permit local discovery and traffic.
-2. Launch AirStereo and click its taskbar tray icon. Wait for discovery or refresh.
-3. Select one speaker or a native pair. For independent stereo, select L first and R second. Playback is disabled with no selection; at most two independent speakers are supported.
-4. Click Play PC audio, then play content on the PC. Drag volume and click ✓, or enable live adjustment.
-5. Use Settings for language, appearance, startup, reconnection and EQ. Stop the connection before changing encoding, sample rate or latency.
+1. Connect your PC and speakers to the same local network and ensure local discovery and firewall rules are allowed.
+2. Launch AirStereo2, click the tray icon, and wait for speakers to appear (or click Refresh).
+3. Check a speaker or native stereo pair and click **Play PC audio**.
+4. Adjust volume in the popup, or enable **Sync Windows system volume to AirStereo2** in Settings to use keyboard media volume keys.
+5. Stop playback before changing latency buffer or audio encoding (ALAC / PCM).
 
-ALAC and PCM preserve the same samples at the same sample rate and bit depth. ALAC usually uses less bandwidth, with the ratio depending on content; PCM uses more bandwidth and remains available as a fallback. Support for 48 kHz depends on receiver negotiation; use the default 44.1 kHz first if connections are unstable. The buffering setting is not a measurement of end-to-end latency.
+ALAC and PCM carry identical lossless 16-bit / 44.1 kHz audio samples; ALAC uses roughly half the bandwidth and is recommended for everyday playback.
 
 ## Troubleshooting and feedback
 
-If speakers are missing, check the subnet, Windows firewall, VPN/virtual adapters and router AP isolation. A Public Windows network profile may restrict discovery. Successful phone playback does not prove discovery traffic is allowed on the PC.
+If speakers are missing or fail to connect, open **Settings → Fault information → Network & firewall** and run **Check receiver network** / **Repair firewall rules…**. Verify both PC and speakers share the same subnet without router AP isolation.
 
-Report problems through [Issues](https://github.com/Flourishze/AirStereo/issues), including the app/Windows versions, speaker model, encoding/sample rate, steps and relevant diagnostics. Redact device names, IP addresses, device IDs and other private information; never upload credentials.
+Report issues via [Issues](https://github.com/Flourishze/AirStereo/issues) with your AirStereo2 version, Windows version, speaker model, and redacted diagnostic logs.
 
 ## Documentation and license
 
-[1.0.8 release notes](docs/releases/v1.0.8.md) · [Changelog](CHANGELOG.md) · [Build](docs/BUILD.md) · [MSIX](docs/MSIX.md) · [Acceptance checklist](docs/TESTING.md)
+[1.0.9 release notes](docs/releases/v1.0.9.md) · [Changelog](CHANGELOG.md) · [MIT License](LICENSE)
 
-Licensed under [MIT](LICENSE). Third-party components retain their own licenses and notices. AirStereo is an independent project and is not affiliated with Apple. AirPlay, HomePod and other trademarks belong to their respective owners.
+Licensed under the [MIT License](LICENSE). AirStereo2 is an independent project and is not affiliated with Apple. AirPlay, HomePod, and other trademarks belong to their respective owners.
