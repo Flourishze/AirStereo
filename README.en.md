@@ -29,10 +29,10 @@ AirStereo2 captures the system mix from your default Windows output device for m
 
 ## Screenshots
 
-![AirStereo2 1.0.9 Dark Overview](docs/images/airstereo2-1.0.9-dark-overview.png)
-![AirStereo2 1.0.9 Light Overview & System Behavior](docs/images/airstereo2-1.0.9-light-overview.png)
-![AirStereo2 1.0.9 10-Band Equalizer](docs/images/airstereo2-1.0.9-equalizer.png)
-![AirStereo2 1.0.9 Takeover Alert & Network Diagnostics](docs/images/airstereo2-1.0.9-takeover-network.png)
+![AirStereo2 1.0.9 Dark Overview](docs/images/airstereo2-1.0.9-dark-overview-en.png)
+![AirStereo2 1.0.9 Light Overview & System Behavior](docs/images/airstereo2-1.0.9-light-overview-en.png)
+![AirStereo2 1.0.9 10-Band Equalizer](docs/images/airstereo2-1.0.9-equalizer-en.png)
+![AirStereo2 1.0.9 Takeover Alert & Network Diagnostics](docs/images/airstereo2-1.0.9-takeover-network-en.png)
 
 ## Installation
 
