@@ -1,0 +1,10 @@
+[package]
+name = "airplay-resampler"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+airplay-core = { path = "../airplay-core" }
+rubato.workspace = true
+thiserror.workspace = true

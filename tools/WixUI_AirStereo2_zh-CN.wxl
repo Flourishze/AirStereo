@@ -1,0 +1,8 @@
+<WixLocalization Culture="zh-cn" Codepage="936" xmlns="http://wixtoolset.org/schemas/v4/wxl">
+  <String Id="WelcomeDlgDescription" Overridable="no" Value="安装向导将在您的计算机上安装 [ProductName] [ProductVersion]。[UPGRADE_NOTICE]单击“下一步”继续，或单击“取消”退出安装向导。" />
+  <String Id="InstallDirDlgDescription" Overridable="no" Value="[INSTALLDIR_HINT]单击“下一步”使用当前目录，或单击“更改”选择其他位置。" />
+  <String Id="VerifyReadyDlgInstallText" Overridable="no" Value="[UPGRADE_NOTICE]单击“安装”开始安装。单击“上一步”查看或更改任何安装设置。单击“取消”退出向导。" />
+  <String Id="msierrSecureObjectsFailedCreateSD" Overridable="yes" Value="无法创建目录权限安全描述符。错误：[2]" />
+  <String Id="msierrSecureObjectsFailedSet" Overridable="yes" Value="无法设置目录访问权限。错误：[2]" />
+  <String Id="msierrSecureObjectsUnknownType" Overridable="yes" Value="未知的安全对象类型：[2]" />
+</WixLocalization>

@@ -1,0 +1,247 @@
+<UserControl x:Class="AirStereo2.SettingsView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:AirStereo2">
+  <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+  <Grid x:Name="SettingsRoot"
+        Padding="{ThemeResource ContentDialogPadding}" RowSpacing="12">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+    <TextBlock local:WinUiLanguage.Text="设置" Style="{StaticResource AirStereo2SettingsTitleStyle}" />
+    <NavigationView x:Name="SettingsNavigation" Grid.Row="1" Margin="0,8,0,0"
+                    PaneDisplayMode="Left" OpenPaneLength="168" CompactPaneLength="48"
+                    IsBackButtonVisible="Collapsed" IsSettingsVisible="False">
+      <NavigationView.MenuItems>
+        <NavigationViewItem local:WinUiLanguage.Text="常规" Tag="general">
+          <NavigationViewItem.Icon><SymbolIcon Symbol="Setting" /></NavigationViewItem.Icon>
+        </NavigationViewItem>
+        <NavigationViewItem local:WinUiLanguage.Text="播放与音频" Tag="playback">
+          <NavigationViewItem.Icon><SymbolIcon Symbol="Play" /></NavigationViewItem.Icon>
+        </NavigationViewItem>
+        <NavigationViewItem local:WinUiLanguage.Text="均衡器" Tag="audio">
+          <NavigationViewItem.Icon><SymbolIcon Symbol="Audio" /></NavigationViewItem.Icon>
+        </NavigationViewItem>
+        <NavigationViewItem local:WinUiLanguage.Text="诊断与网络" Tag="diagnostics">
+          <NavigationViewItem.Icon><SymbolIcon Symbol="Important" /></NavigationViewItem.Icon>
+        </NavigationViewItem>
+        <NavigationViewItem local:WinUiLanguage.Text="关于与更新" Tag="about">
+          <NavigationViewItem.Icon><SymbolIcon Symbol="Help" /></NavigationViewItem.Icon>
+        </NavigationViewItem>
+      </NavigationView.MenuItems>
+      <NavigationView.Content>
+        <Grid>
+          <!-- 1. 常规：外观、语言、开机自启、通知、默认音响 -->
+          <ScrollViewer x:Name="GeneralPage" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel x:Name="GeneralRoot" Spacing="12" Padding="12,8,12,12">
+              <TextBlock local:WinUiLanguage.Text="外观与语言" Style="{StaticResource AirStereo2SectionTitleStyle}" />
+              <Border Style="{StaticResource AirStereo2CardStyle}" Padding="12">
+                <StackPanel Spacing="10">
+                  <local:BottomComboBox x:Name="LanguageChoice" local:WinUiLanguage.Text="语言" MaxDropDownHeight="160" />
+                  <local:BottomComboBox x:Name="Appearance" local:WinUiLanguage.Text="外观" MaxDropDownHeight="160" />
+                  <TextBlock x:Name="AppearanceStatus" local:WinUiLanguage.Text="语言和主题切换后立即生效并自动保存。"
+                             Style="{StaticResource AirStereo2SecondaryTextStyle}" TextWrapping="Wrap" />
+                </StackPanel>
+              </Border>
+
+              <TextBlock local:WinUiLanguage.Text="启动与通知" Style="{StaticResource AirStereo2SectionTitleStyle}" Margin="0,4,0,0" />
+              <Border Style="{StaticResource AirStereo2CardStyle}" Padding="12">
+                <StackPanel Spacing="8">
+                  <CheckBox x:Name="Startup" local:WinUiLanguage.Text="登录 Windows 后自动启动" />
+                  <CheckBox x:Name="SilentStartup" local:WinUiLanguage.Text="开机静默启动（仅显示托盘图标）" />
+                  <CheckBox x:Name="ConnectionNotifications" local:WinUiLanguage.Text="连接状态变更时显示系统通知" />
+                </StackPanel>
+              </Border>
+
+              <TextBlock local:WinUiLanguage.Text="默认音响" Style="{StaticResource AirStereo2SectionTitleStyle}" Margin="0,4,0,0" />
+              <Border x:Name="DefaultSpeakersCard" Style="{StaticResource AirStereo2CardStyle}" Padding="12">
+                <StackPanel Spacing="8">
+                  <CheckBox x:Name="AutoConnect" local:WinUiLanguage.Text="启动时自动连接默认音响" />
+                  <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="DefaultSpeakersSummary"
+                               Style="{StaticResource AirStereo2SecondaryTextStyle}"
+                               VerticalAlignment="Center" TextWrapping="Wrap" />
+                    <Button x:Name="RefreshDefaultSpeakers" Grid.Column="1"
+                            local:WinUiLanguage.Text="刷新列表" Padding="10,4" />
+                  </Grid>
+                  <StackPanel x:Name="DefaultSpeakersList" Spacing="4" />
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </ScrollViewer>
+
+          <!-- 2. 播放与音频：AirPlay 协议、编码、延迟缓冲、音量与重连 -->
+          <ScrollViewer x:Name="PlaybackPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel x:Name="PlaybackRoot" Spacing="12" Padding="12,8,12,12">
+              <TextBlock local:WinUiLanguage.Text="协议与编码" Style="{StaticResource AirStereo2SectionTitleStyle}" />
+              <Border Style="{StaticResource AirStereo2CardStyle}" Padding="12">
+                <StackPanel Spacing="10">
+                  <local:BottomComboBox x:Name="ProtocolChoice" local:WinUiLanguage.Text="AirPlay 协议" MaxDropDownHeight="180" />
+                  <TextBlock x:Name="ProtocolHint"
+                             local:WinUiLanguage.Text="第三方功放或老设备若连接无声，建议选择“AirPlay 1 · 兼容模式”；HomePod 立体声对建议使用“自动”或“AirPlay 2”。"
+                             Style="{StaticResource AirStereo2SecondaryTextStyle}" TextWrapping="Wrap" />
+                  <local:BottomComboBox x:Name="Codec" local:WinUiLanguage.Text="音频编码" MaxDropDownHeight="160" />
+                  <TextBlock x:Name="CodecDescription"
+                             local:WinUiLanguage.Text="两者音质完全相同。ALAC 压缩后占用带宽约为 PCM 的一半；PCM 仅在支持未压缩模式的 AirPlay 1 / 兼容设备上生效。"
+                             Style="{StaticResource AirStereo2SecondaryTextStyle}" TextWrapping="Wrap" />
+                  <local:BottomComboBox x:Name="SampleRateChoice" local:WinUiLanguage.Text="输出采样率" MaxDropDownHeight="160" />
+                  <TextBlock x:Name="SampleRateHint"
+                             local:WinUiLanguage.Text="默认 44.1 kHz 兼容性最佳；48 kHz 适用于支持 48 kHz 的 AirPlay 2 音响（AirPlay 1 或不支持设备将自动回退 44.1 kHz）。"
+                             Style="{StaticResource AirStereo2SecondaryTextStyle}" TextWrapping="Wrap" />
+                </StackPanel>
+              </Border>
+
+              <TextBlock local:WinUiLanguage.Text="延迟缓冲" Style="{StaticResource AirStereo2SectionTitleStyle}" Margin="0,4,0,0" />
+              <Border Style="{StaticResource AirStereo2CardStyle}" Padding="12">
+                <StackPanel Spacing="10">
+                  <local:BottomComboBox x:Name="Latency" local:WinUiLanguage.Text="缓冲模式" MaxDropDownHeight="240" />
+                  <Grid x:Name="CustomLatencyRow" Visibility="Collapsed" ColumnSpacing="12" VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="Auto" />
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock local:WinUiLanguage.Text="自定义延迟" Style="{StaticResource AirStereo2SecondaryTextStyle}" VerticalAlignment="Center" />
+                    <Slider x:Name="CustomLatency" Grid.Column="1" Minimum="0" Maximum="1000" StepFrequency="10" />
+                    <TextBlock x:Name="CustomLatencyValue" Grid.Column="2" Style="{StaticResource AirStereo2SecondaryTextStyle}" VerticalAlignment="Center" />
+                  </Grid>
+                  <TextBlock x:Name="LatencyHint"
+                             local:WinUiLanguage.Text="延迟越低音画同步越好，但抗网络波动能力越弱；日常听歌建议使用“自动”或“标准 · 200 ms”以上。请先停止播放再调整协议、编码和延迟。"
+                             Style="{StaticResource AirStereo2SecondaryTextStyle}" TextWrapping="Wrap" />
+                </StackPanel>
+              </Border>
+
+              <TextBlock local:WinUiLanguage.Text="音量与重连" Style="{StaticResource AirStereo2SectionTitleStyle}" Margin="0,4,0,0" />
+              <Border Style="{StaticResource AirStereo2CardStyle}" Padding="12">
+                <StackPanel Spacing="8">
+                  <CheckBox x:Name="MuteLocal" local:WinUiLanguage.Text="串流时静音本机输出" />
+                  <TextBlock local:WinUiLanguage.Text="开启后串流期间自动静音电脑本机扬声器；若调整系统音量导致解除静音，约 0.5 秒后会自动重新静音。"
+                             Style="{StaticResource AirStereo2SecondaryTextStyle}" TextWrapping="Wrap" Margin="24,-4,0,0" />
+                  <CheckBox x:Name="SyncSystemVolume" local:WinUiLanguage.Text="系统音量自动同步到 AirStereo2" />
+                  <CheckBox x:Name="Reconnect" local:WinUiLanguage.Text="播放中断时自动重连" />
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </ScrollViewer>
+
+          <!-- 3. 均衡器 -->
+          <ScrollViewer x:Name="AudioPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+            <StackPanel x:Name="EqualizerRoot" Spacing="12" Padding="12,8,12,12">
+              <TextBlock local:WinUiLanguage.Text="均衡器" Style="{StaticResource AirStereo2SectionTitleStyle}" />
+              <Border Style="{StaticResource AirStereo2CardStyle}" Padding="12">
+                <StackPanel Spacing="10">
+                  <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <CheckBox x:Name="EqualizerEnabled" local:WinUiLanguage.Text="启用均衡器" VerticalAlignment="Center" />
+                    <Button x:Name="ResetEqualizer" Grid.Column="1" local:WinUiLanguage.Text="重置为平坦" Padding="12,4" />
+                  </Grid>
+                  <local:BottomComboBox x:Name="EqualizerPreset" local:WinUiLanguage.Text="均衡器预设" MaxDropDownHeight="240" />
+                  <TextBlock local:WinUiLanguage.Text="十段均衡器，调整即时生效；关闭后音频完全旁路。"
+                             Style="{StaticResource AirStereo2SecondaryTextStyle}" TextWrapping="Wrap" />
+                </StackPanel>
+              </Border>
+              <Border Style="{StaticResource AirStereo2CardStyle}" Padding="12">
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
+                              HorizontalScrollMode="Auto" VerticalScrollMode="Disabled">
+                  <Grid x:Name="EqualizerBands" MinWidth="600" Height="184" ColumnSpacing="2">
+                    <Grid.RowDefinitions>
+                      <RowDefinition Height="Auto" />
+                      <RowDefinition Height="*" />
+                      <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                  </Grid>
+                </ScrollViewer>
+              </Border>
+            </StackPanel>
+          </ScrollViewer>
+
+          <!-- 4. 诊断与网络（合并原故障信息与实时诊断日志） -->
+          <ScrollViewer x:Name="DiagnosticsPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel x:Name="DiagnosticsRoot" Spacing="12" Padding="12,8,12,12">
+              <TextBlock local:WinUiLanguage.Text="网络与防火墙" Style="{StaticResource AirStereo2SectionTitleStyle}" />
+              <Border Style="{StaticResource AirStereo2CardStyle}" Padding="12">
+                <StackPanel Spacing="10">
+                  <TextBlock x:Name="NetworkCheckStatus" Style="{StaticResource AirStereo2SecondaryTextStyle}" TextWrapping="Wrap" />
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button x:Name="CheckNetwork" local:WinUiLanguage.Text="检查设备网络" />
+                    <Button x:Name="FixFirewall" local:WinUiLanguage.Text="修复防火墙规则…" />
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+
+              <TextBlock local:WinUiLanguage.Text="故障诊断报告" Style="{StaticResource AirStereo2SectionTitleStyle}" Margin="0,4,0,0" />
+              <Border Style="{StaticResource AirStereo2CardStyle}" Padding="12">
+                <StackPanel Spacing="10">
+                  <TextBlock x:Name="Diagnostics" IsTextSelectionEnabled="True" Style="{StaticResource AirStereo2SecondaryTextStyle}" TextWrapping="Wrap" />
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button x:Name="ExportDiagnostics" local:WinUiLanguage.Text="导出故障日志" />
+                    <Button x:Name="OpenDiagnostics" local:WinUiLanguage.Text="打开故障目录" />
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+
+              <TextBlock local:WinUiLanguage.Text="实时诊断日志" Style="{StaticResource AirStereo2SectionTitleStyle}" Margin="0,4,0,0" />
+              <Border Style="{StaticResource AirStereo2CardStyle}" Padding="12">
+                <StackPanel Spacing="8">
+                  <TextBlock x:Name="LatestNotice" Style="{StaticResource AirStereo2SecondaryTextStyle}" TextWrapping="Wrap" />
+                  <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                  <ScrollViewer x:Name="RecentActivityScroll" Height="220" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <TextBlock x:Name="RecentActivity" Style="{StaticResource AirStereo2SecondaryTextStyle}"
+                               TextWrapping="Wrap" IsTextSelectionEnabled="True" />
+                  </ScrollViewer>
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </ScrollViewer>
+
+          <!-- 5. 关于与更新 -->
+          <ScrollViewer x:Name="AboutPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel x:Name="AboutRoot" Spacing="12" Padding="12,8,12,12">
+              <TextBlock local:WinUiLanguage.Text="软件更新" Style="{StaticResource AirStereo2SectionTitleStyle}" />
+              <Border Style="{StaticResource AirStereo2CardStyle}" Padding="12">
+                <StackPanel Spacing="10">
+                  <TextBlock x:Name="DistributionInfo" Style="{StaticResource AirStereo2PrimaryTextStyle}" TextWrapping="Wrap" />
+                  <CheckBox x:Name="AutoUpdateNotify" local:WinUiLanguage.Text="启动时自动检查新版本提醒" />
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button x:Name="CheckUpdates" local:WinUiLanguage.Text="检查更新" />
+                    <Button x:Name="ApplyUpdate" Style="{StaticResource AccentButtonStyle}" Visibility="Collapsed" local:WinUiLanguage.Text="立即下载并更新" />
+                    <Button x:Name="StoreUpdate" Style="{StaticResource AccentButtonStyle}" Visibility="Collapsed" local:WinUiLanguage.Text="前往 Microsoft Store 更新" />
+                    <Button x:Name="UpdateDownload" local:WinUiLanguage.Text="查看发布页" />
+                  </StackPanel>
+                  <StackPanel x:Name="UpdateProgressPanel" Visibility="Collapsed" Spacing="6">
+                    <ProgressBar x:Name="UpdateProgressBar" Minimum="0" Maximum="100" Value="0" />
+                    <TextBlock x:Name="UpdateProgressText" Style="{StaticResource AirStereo2SecondaryTextStyle}" TextWrapping="Wrap" />
+                  </StackPanel>
+                  <TextBlock x:Name="UpdateStatus" Style="{StaticResource AirStereo2SecondaryTextStyle}" TextWrapping="Wrap" />
+                </StackPanel>
+              </Border>
+
+              <TextBlock local:WinUiLanguage.Text="关于 AirStereo2" Style="{StaticResource AirStereo2SectionTitleStyle}" Margin="0,4,0,0" />
+              <Border Style="{StaticResource AirStereo2CardStyle}" Padding="12">
+                <StackPanel Spacing="8">
+                  <TextBlock x:Name="AboutVersion" Style="{StaticResource AirStereo2PrimaryTextStyle}" />
+                  <TextBlock local:WinUiLanguage.Text="Windows 立体声 AirPlay 1 / AirPlay 2 音频发送器，采用 MIT 许可证开源发布。"
+                             Style="{StaticResource AirStereo2SecondaryTextStyle}" TextWrapping="Wrap" />
+                  <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                    <Button x:Name="OpenRepo" local:WinUiLanguage.Text="GitHub 项目主页" />
+                    <Button x:Name="OpenIssues" local:WinUiLanguage.Text="问题反馈" />
+                    <Button x:Name="SupportTea" local:WinUiLanguage.Text="请作者喝茶" />
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </ScrollViewer>
+        </Grid>
+      </NavigationView.Content>
+    </NavigationView>
+  </Grid>
+  </Grid>
+</UserControl>

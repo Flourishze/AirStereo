@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType><TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier><PlatformTarget>x64</PlatformTarget>
+    <UseWinUI>true</UseWinUI><WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained><WindowsAppSDKBootstrapInitialize>false</WindowsAppSDKBootstrapInitialize>
+    <SelfContained>true</SelfContained><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>AirStereo2</AssemblyName><RootNamespace>AirStereo2</RootNamespace>
+    <Product>AirStereo2</Product><AssemblyTitle>AirStereo2</AssemblyTitle><Company>Flourishze</Company>
+    <Copyright>Copyright (c) 2026 Flourishze</Copyright>
+    <Description>AirStereo2 - Stereo AirPlay sender for Windows</Description>
+    <DebugType>none</DebugType><DebugSymbols>false</DebugSymbols><Deterministic>true</Deterministic>
+    <ApplicationManifest>app.manifest</ApplicationManifest><ApplicationIcon>AirStereo2.ico</ApplicationIcon>
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+    <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition><EnableDefaultPageItems>false</EnableDefaultPageItems>
+    <StartupObject>AirStereo2.Program</StartupObject><EnablePriGenTooling>true</EnablePriGenTooling>
+    <NuGetAudit>false</NuGetAudit><NoWarn>$(NoWarn);CA1416</NoWarn>
+    <Version>1.1.1</Version><AssemblyVersion>1.1.1.0</AssemblyVersion><FileVersion>1.1.1.0</FileVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <ApplicationDefinition Include="App.xaml" />
+    <Page Include="ShellView.xaml"><Generator>MSBuild:Compile</Generator><XamlRuntime>$(DefaultXamlRuntime)</XamlRuntime></Page>
+    <Page Include="SettingsView.xaml"><Generator>MSBuild:Compile</Generator><XamlRuntime>$(DefaultXamlRuntime)</XamlRuntime></Page>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260921001" />
+    <ProjectReference Include="..\Core\AirStereo2.Core.csproj" />
+    <Content Include="AirStereo2.ico;TrayDark.ico;TrayLight.ico;SupportTeaQr.png" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
+

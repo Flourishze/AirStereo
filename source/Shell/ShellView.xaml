@@ -1,0 +1,126 @@
+<UserControl x:Class="AirStereo2.ShellView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:AirStereo2"
+        HorizontalContentAlignment="Stretch"
+        VerticalContentAlignment="Stretch">
+  <!-- Keep the window background opaque while the inner content animates. -->
+  <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+  <Grid x:Name="LayoutRoot"
+        Padding="{ThemeResource ContentDialogPadding}"
+        RowSpacing="12">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <Grid ColumnSpacing="8">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <StackPanel Spacing="2" VerticalAlignment="Center">
+        <TextBlock Text="AirStereo2" Style="{StaticResource AirStereo2SettingsTitleStyle}" />
+        <TextBlock local:WinUiLanguage.Text="电脑声音 · AirPlay 输出" Style="{StaticResource AirStereo2SecondaryTextStyle}" />
+      </StackPanel>
+      <Button x:Name="RefreshButton" Grid.Column="1" Style="{StaticResource AirStereo2IconButtonStyle}"
+              local:WinUiLanguage.Hint="刷新音响列表">
+        <FontIcon x:Name="RefreshIcon" Glyph="&#xE72C;" Style="{StaticResource AirStereo2IconStyle}" />
+      </Button>
+      <Button x:Name="Settings" Grid.Column="2" Style="{StaticResource AirStereo2IconButtonStyle}"
+              local:WinUiLanguage.Hint="设置">
+        <Grid Width="18" Height="18">
+          <FontIcon Glyph="&#xE713;" Style="{StaticResource AirStereo2IconStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+          <Ellipse x:Name="UpdateDot" Width="7" Height="7" Fill="{ThemeResource SystemAccentColor}"
+                   HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-2,-2,0" Visibility="Collapsed" />
+        </Grid>
+      </Button>
+      <Button x:Name="Hide" Grid.Column="3" Style="{StaticResource AirStereo2IconButtonStyle}"
+              local:WinUiLanguage.Hint="收回到托盘">
+        <FontIcon Glyph="&#xE70D;" Style="{StaticResource AirStereo2IconStyle}" />
+      </Button>
+    </Grid>
+    <Grid x:Name="DevicePanel" Grid.Row="1">
+      <Border MinHeight="112" Style="{StaticResource AirStereo2CardStyle}" Padding="8">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+          <StackPanel x:Name="Devices" Spacing="2" />
+        </ScrollViewer>
+      </Border>
+    </Grid>
+    <Border x:Name="PlaybackCard" Grid.Row="2" Style="{StaticResource AirStereo2CardStyle}" Padding="12">
+      <StackPanel Spacing="10">
+        <Grid ColumnSpacing="10">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <StackPanel Spacing="2" VerticalAlignment="Center">
+            <TextBlock local:WinUiLanguage.Text="播放控制" Style="{StaticResource AirStereo2SectionTitleStyle}" />
+            <TextBlock x:Name="Status" Style="{StaticResource AirStereo2SecondaryTextStyle}" TextWrapping="Wrap" />
+          </StackPanel>
+          <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center" HorizontalAlignment="Right">
+            <Border x:Name="ProtocolBadge"
+                    HorizontalAlignment="Right"
+                    Padding="7,1,7,2"
+                    CornerRadius="4"
+                    Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1">
+              <TextBlock x:Name="ProtocolLabel"
+                         FontSize="11"
+                         FontWeight="SemiBold"
+                         Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+            </Border>
+            <TextBlock x:Name="Format"
+                       FontSize="12"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                       HorizontalAlignment="Right"
+                       TextAlignment="Right" />
+          </StackPanel>
+        </Grid>
+        <Button x:Name="Play" HorizontalAlignment="Stretch" MinHeight="44"
+                HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                Padding="0" Style="{StaticResource AccentButtonStyle}">
+          <StackPanel Orientation="Horizontal" Spacing="8"
+                      HorizontalAlignment="Center" VerticalAlignment="Center">
+            <FontIcon x:Name="PlayIcon" Glyph="&#xE768;" FontSize="14" VerticalAlignment="Center" />
+            <TextBlock x:Name="PlayText" local:WinUiLanguage.Text="播放电脑声音" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <Button x:Name="StopWaiting" HorizontalAlignment="Stretch" Visibility="Collapsed"
+                local:WinUiLanguage.Text="停止等待自动恢复" />
+      </StackPanel>
+    </Border>
+    <Border x:Name="VolumeCard" Grid.Row="3" Style="{StaticResource AirStereo2CardStyle}" Padding="12">
+      <StackPanel Spacing="8">
+        <Grid ColumnSpacing="12">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <TextBlock local:WinUiLanguage.Text="音量" Style="{StaticResource AirStereo2SecondaryTextStyle}" VerticalAlignment="Center" />
+          <Slider x:Name="Volume" Grid.Column="1" Minimum="0" Maximum="100" StepFrequency="1" />
+          <TextBlock x:Name="VolumeValue" Grid.Column="2" Style="{StaticResource AirStereo2AccentTextStyle}"
+                     VerticalAlignment="Center" MinWidth="44" TextAlignment="Right" />
+          <Button x:Name="ApplyVolume" Grid.Column="3" Style="{StaticResource AirStereo2IconButtonStyle}"
+                  HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                  local:WinUiLanguage.Hint="应用音量">
+            <Grid x:Name="ApplyVolumeIcon" Width="16" Height="16"
+                  HorizontalAlignment="Center" VerticalAlignment="Center" UseLayoutRounding="True">
+              <Path Data="M 2,8 L 6,12 L 14,4" StrokeThickness="1.5"
+                    Stroke="{Binding Foreground, ElementName=ApplyVolume}"
+                    StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" />
+            </Grid>
+          </Button>
+        </Grid>
+        <CheckBox x:Name="RealtimeVolume" local:WinUiLanguage.Text="实时音量调整" VerticalAlignment="Center" />
+      </StackPanel>
+    </Border>
+  </Grid>
+  </Grid>
+</UserControl>

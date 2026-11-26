@@ -1,0 +1,31 @@
+[package]
+name = "airstereo2-backend"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "airstereo2-engine"
+path = "src/main.rs"
+
+[dependencies]
+airplay-core = { path = "../airplay-core" }
+airplay-crypto = { path = "../airplay-crypto" }
+airplay-pairing = { path = "../airplay-pairing" }
+airplay-rtsp = { path = "../airplay-rtsp" }
+airplay-timing = { path = "../airplay-timing" }
+airplay-resampler = { path = "../airplay-resampler" }
+airplay-audio = { path = "../airplay-audio" }
+airplay-client = { path = "../airplay-client" }
+anyhow.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tracing-appender.workspace = true
+crossbeam-channel.workspace = true
+parking_lot.workspace = true
+wasapi.workspace = true
+rand.workspace = true
+base64.workspace = true
